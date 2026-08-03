@@ -92,6 +92,13 @@ class ChatResponse(BaseModel):
     reply: str
 
 
+class ProjectExtractionOut(BaseModel):
+    name: str
+    customer: str
+    cloud: str
+    description: str
+
+
 class CurrentUserOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: str

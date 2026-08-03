@@ -1,3 +1,4 @@
+import json
 import os
 import subprocess
 import xml.etree.ElementTree as ET
@@ -247,3 +248,95 @@ def chat_reply(messages: list[dict[str, str]], provider: str = "litellm") -> str
     if provider == "claude_cli":
         return _chat_via_claude_cli(messages)
     return _chat_via_litellm(messages)
+
+
+EXTRACT_PROJECT_SYSTEM_PROMPT = (
+    "You read a conversation between a solution architect and an AI scoping assistant, and "
+    "summarize it into a starting point for a new Project record. Return ONLY a single JSON "
+    'object — no markdown code fences, no prose before or after it — with exactly these four '
+    'string keys: "name" (a short project name, e.g. "Acme Retail Platform Migration"), '
+    '"customer" (the customer/company name if mentioned, else an empty string), "cloud" (one '
+    'of "AWS", "Azure", "GCP", "Multi-Cloud" if a cloud provider was discussed, else an empty '
+    'string), and "description" (a 1-3 sentence summary of what\'s being built). If the '
+    "conversation doesn't cover something, leave that field as an empty string rather than "
+    "guessing — the architect will review and fill in gaps themselves before the project is "
+    "created."
+)
+
+
+def _extract_json(raw: str) -> str:
+    """Strip stray markdown code fences some models add despite instructions to the contrary."""
+    text = raw.strip()
+    if text.startswith("```"):
+        text = text.split("\n", 1)[1] if "\n" in text else ""
+        if text.endswith("```"):
+            text = text.rsplit("```", 1)[0]
+    return text.strip()
+
+
+def _extract_project_via_litellm(messages: list[dict[str, str]]) -> str:
+    model = os.getenv("LITELLM_MODEL", "gpt-4o-mini")
+    try:
+        response = litellm.completion(
+            model=model,
+            messages=[{"role": "system", "content": EXTRACT_PROJECT_SYSTEM_PROMPT}, *messages],
+        )
+    except Exception as exc:  # noqa: BLE001 - surface provider errors verbatim to the caller
+        raise RuntimeError(
+            f"{exc} — configure a provider API key in backend/.env (model is '{model}'), "
+            f"or switch to Claude CLI mode in Settings."
+        ) from exc
+
+    return response["choices"][0]["message"]["content"]
+
+
+def _extract_project_via_claude_cli(messages: list[dict[str, str]]) -> str:
+    claude_bin = resolve_claude_binary()
+    if claude_bin is None:
+        raise RuntimeError(
+            "The 'claude' CLI was not found. Set CLAUDE_CLI_PATH in backend/.env to its full path, or make sure "
+            "its directory is on PATH for the backend process, then run `claude login` if not already logged in."
+        )
+
+    transcript = "\n\n".join(f"{m['role'].upper()}: {m['content']}" for m in messages)
+    prompt = f"{EXTRACT_PROJECT_SYSTEM_PROMPT}\n\nConversation:\n\n{transcript}"
+    try:
+        result = subprocess.run(
+            [claude_bin, "-p", prompt],
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            timeout=120,
+        )
+    except subprocess.TimeoutExpired as exc:
+        raise RuntimeError("Claude CLI timed out after 120s.") from exc
+
+    if result.returncode != 0:
+        raise RuntimeError(f"Claude CLI exited {result.returncode}: {(result.stderr or result.stdout).strip()}")
+
+    return result.stdout.strip()
+
+
+def extract_project_from_chat(messages: list[dict[str, str]], provider: str = "litellm") -> dict[str, str]:
+    raw = (
+        _extract_project_via_claude_cli(messages)
+        if provider == "claude_cli"
+        else _extract_project_via_litellm(messages)
+    )
+
+    text = _extract_json(raw)
+    try:
+        data = json.loads(text)
+    except json.JSONDecodeError as exc:
+        raise RuntimeError(f"AI returned invalid JSON while summarizing the conversation ({exc}).") from exc
+
+    if not isinstance(data, dict):
+        raise RuntimeError("AI returned unexpected JSON while summarizing the conversation (expected an object).")
+
+    return {
+        "name": str(data.get("name") or ""),
+        "customer": str(data.get("customer") or ""),
+        "cloud": str(data.get("cloud") or ""),
+        "description": str(data.get("description") or ""),
+    }

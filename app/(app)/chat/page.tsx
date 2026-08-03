@@ -1,9 +1,11 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { Avatar, Button, Card, Input, Spin, Typography, message } from "antd";
-import { RobotOutlined, SendOutlined, UserOutlined } from "@ant-design/icons";
-import { ChatMessage, sendChatMessage } from "@/lib/api";
+import { ProjectOutlined, RobotOutlined, SendOutlined, UserOutlined } from "@ant-design/icons";
+import { ChatMessage, extractProjectFromChat, ProjectExtraction, sendChatMessage } from "@/lib/api";
+import NewProjectModal from "@/components/NewProjectModal";
 
 const { Title, Text, Paragraph } = Typography;
 
@@ -17,11 +19,17 @@ const INITIAL_MESSAGES: ChatMessage[] = [
 ];
 
 export default function ChatPage() {
+  const router = useRouter();
   const [messages, setMessages] = useState<ChatMessage[]>(INITIAL_MESSAGES);
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
+  const [extracting, setExtracting] = useState(false);
+  const [newProjectOpen, setNewProjectOpen] = useState(false);
+  const [extracted, setExtracted] = useState<ProjectExtraction | undefined>();
   const [messageApi, contextHolder] = message.useMessage();
   const scrollRef = useRef<HTMLDivElement>(null);
+
+  const hasUserMessage = messages.some((m) => m.role === "user");
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
@@ -44,6 +52,19 @@ export default function ChatPage() {
       setDraft(text);
     } finally {
       setSending(false);
+    }
+  };
+
+  const handleCreateProjectFromChat = async () => {
+    setExtracting(true);
+    try {
+      const result = await extractProjectFromChat(messages);
+      setExtracted(result);
+      setNewProjectOpen(true);
+    } catch (err) {
+      messageApi.error(err instanceof Error ? err.message : "Failed to summarize the conversation.", 8);
+    } finally {
+      setExtracting(false);
     }
   };
 
@@ -103,10 +124,30 @@ export default function ChatPage() {
           </div>
         </div>
       </Card>
-      <Paragraph type="secondary" className="text-xs">
-        This chat is for scoping and discussion — it doesn&apos;t generate documents directly. Once you know what you
-        need, create a project from a matching template to generate a draft.
-      </Paragraph>
+      <div className="flex items-center justify-between gap-4 flex-wrap">
+        <Paragraph type="secondary" className="text-xs" style={{ marginBottom: 0 }}>
+          This chat is for scoping and discussion — it doesn&apos;t generate documents directly. Once you know what
+          you need, create a project from this conversation (or start one from a matching template).
+        </Paragraph>
+        <Button
+          icon={<ProjectOutlined />}
+          loading={extracting}
+          disabled={!hasUserMessage}
+          onClick={handleCreateProjectFromChat}
+        >
+          Create Project from this Chat
+        </Button>
+      </div>
+
+      <NewProjectModal
+        open={newProjectOpen}
+        onClose={() => setNewProjectOpen(false)}
+        onCreated={(project) => {
+          setNewProjectOpen(false);
+          router.push(`/projects/${project.id}`);
+        }}
+        initialValues={extracted}
+      />
     </div>
   );
 }

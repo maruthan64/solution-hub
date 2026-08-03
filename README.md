@@ -52,10 +52,11 @@ until you click **Save Changes**.
 **4. Add an architecture diagram** — click **Diagram** on a document to open an
 embedded draw.io (diagrams.net) canvas. **Ask AI to draft** generates a starting
 diagram using real AWS/Azure/GCP icons based on the project's cloud; hand-edit it like
-any normal draw.io diagram, **Save** to persist it, then **Insert into document** to drop
-it into the Markdown as an image (it lands at the end of the content — move the line
-manually if you want it under a specific heading). Word/PDF export renders it as a real
-embedded picture, not a broken link.
+any normal draw.io diagram, **Save** to persist it, then pick where it should land
+(end of document, or directly under an existing heading) and **Insert into document**.
+Re-inserting after further edits moves the image to the newly chosen spot instead of
+leaving a duplicate behind. Word/PDF export renders it as a real embedded picture, not
+a broken link.
 
 **5. Preview before sharing** — the **Preview** button renders the Markdown as it will
 actually look (headings, tables, bold, embedded diagrams), so you can sanity-check
@@ -72,19 +73,27 @@ showing that note as a banner until resubmitted). Editing an Approved or In-Revi
 document automatically reverts it to Draft (this includes inserting/re-inserting a
 diagram), so "Approved" always reflects reviewed content, never stale content.
 
-**7. Build a quote** — Service Catalog → click a tier/add-on card for full resource
-details, **Add to Cart** the ones a customer wants, optionally **Compare** a couple side
-by side, then fill in Customer Name + Description and generate a Word/PDF/branded
-Proposal with a real computed total. Use **New Package** to add a new Tier/Container/
-Add-On to the catalog (previously only editing existing ones was possible). Starting a
-quote from a project's **Generate Quote** button pre-fills the customer name and saves
-the quote to that project's **Quotes** table; quotes generated directly from
-`/service-catalog` are still one-off and not linked to anything.
+**7. Build a quote or a cost estimate** — Service Catalog → click a tier/add-on card for
+full resource details, **Add to Cart** the ones a customer wants, optionally **Compare**
+a couple side by side. Use **New Package** to add a new Tier/Container/Add-On to the
+catalog (previously only editing existing ones was possible). Optionally pick **Link to
+Project** (works whether you arrived here via a project's **Generate Quote** button, which
+pre-fills it, or navigated to `/service-catalog` directly) — linking makes the generated
+quote show up on that project's **Quotes** table. Fill in Customer Name + Description and
+**Generate Quote** for a Word/PDF/branded Proposal with a real computed total, or, with a
+project linked, **Save as Cost Estimate Document** to turn the same selection into a real
+computed Markdown table (not AI-guessed numbers) saved as that project's editable **Cost
+Estimate** document — regenerating it updates the same document rather than creating a
+duplicate.
 
-**8. Scope with AI Chat** — `/chat` is a real multi-turn conversation (via whichever AI
-provider is selected in Settings) for talking through a solution before committing to a
-project. It's discussion-only — it doesn't create a project or document for you, so once
-you know what you need, go create the project from a matching template (step 2).
+**8. Scope with AI Chat, then create a project from it** — `/chat` is a real multi-turn
+conversation (via whichever AI provider is selected in Settings) for talking through a
+solution before committing to a project. Once you've discussed enough, **Create Project
+from this Chat** asks the AI to summarize the conversation into a name/customer/cloud/
+description, then opens **New Project** pre-filled with its best guess — review and edit
+before creating, same as any other new project. (The conversation itself isn't saved
+server-side, so this only works within the same browser session — refreshing `/chat`
+starts over.)
 
 **9. Everything else** — Knowledge Base (upload/download org standards), Users (invite
 teammates, sets their role), Connectors (manage real Claude Code MCP servers), Audit
@@ -140,15 +149,19 @@ runs entirely client-side; only Save/AI-draft/PNG-export round-trip to the backe
 
 **A typical session:**
 1. Log in → backend issues a JWT cookie.
-2. Pick a Template or Document, optionally ask the AI Assistant to draft a section
+2. Scope in AI Chat, then **Create Project from this Chat** to hand off a summarized
+   name/customer/cloud/description into a reviewable New Project form — or just create
+   the project directly from a template.
+3. Pick a Template or Document, optionally ask the AI Assistant to draft a section
    (routed through LiteLLM or the local Claude CLI, whichever Settings selects), add an
    AI-drafted/hand-edited architecture diagram → export to Word or PDF.
-3. Or: build a quote in the Service Catalog — add tiers/add-ons to the cart, fill in
-   customer name + description, generate a Word/PDF/branded-Proposal quote with a
-   real computed total, optionally linked back to a Project.
-4. Every meaningful write (login, template edit, quote generated, diagram saved, file
-   uploaded, user invited, etc.) writes a real row to Audit Logs — nothing there is
-   static seed data.
+4. Or: build a quote or cost estimate in the Service Catalog — add tiers/add-ons to the
+   cart, optionally link a Project, generate a Word/PDF/branded-Proposal quote with a
+   real computed total, or save a computed Cost Estimate document straight onto the
+   project.
+5. Every meaningful write (login, template edit, quote generated, cost estimate saved,
+   diagram saved, file uploaded, user invited, etc.) writes a real row to Audit Logs —
+   nothing there is static seed data.
 
 ## Status: what's real vs. not yet
 
@@ -162,20 +175,23 @@ role-based access control, Connectors (reflects and manages real Claude Code MCP
 servers), audit logging, AI Chat (real multi-turn conversation via the same
 LiteLLM/Claude CLI provider selected in Settings), architecture diagram generation
 (AI-drafted via draw.io embed, hand-editable, embeds as a real image in Word/PDF
-exports), and Service Catalog quotes linked back to a Project.
+exports, with insert-under-a-specific-heading support), Service Catalog quotes linked
+back to a Project (from anywhere, not just the project page), a Cost Estimator that
+computes a real Markdown table from actual Service Catalog pricing and attaches it to
+the project as an editable Document, and AI Chat → Project hand-off (AI summarizes the
+conversation, architect reviews/edits before the project is actually created). Backend
+(pytest) and frontend (Vitest) automated test suites exist, gated by a GitHub Actions
+CI pipeline (lint + test + build) on every push/PR to `main`.
 
 **Not yet real:**
-- No pipeline connects Projects → AI Chat → generated Documents. AI Chat is
-  conversational only — it doesn't turn a conversation into a project or document yet;
-  that still requires creating a project from a template. Templates and Documents are
-  now chained to Diagrams and (optionally) Service Catalog quotes, but Projects → AI
-  Chat is still disconnected.
-- No automated Cost Estimator beyond the fixed Service Catalog pricing.
-- Inserting a diagram into a document always appends it at the end of the content —
-  there's no "insert at cursor" or "insert under this heading."
-- Quotes generated directly from `/service-catalog` (not opened via a project's
-  **Generate Quote** button) still aren't linked to any project.
-- No automated tests and no CI pipeline exist in this repo yet.
+- Chat conversations aren't persisted server-side — refreshing `/chat` loses the
+  conversation, so **Create Project from this Chat** only works within the same browser
+  session.
+- A project's Cost Estimate is a single document that gets overwritten on regeneration —
+  unlike Quotes (one row kept per generation), there's no history of past estimates.
+- Frontend test coverage is minimal (`lib/api.ts`'s request/error handling only) — most
+  page/component logic is untested; the CI gate is lint + build + that small unit suite,
+  not full UI coverage.
 
 ## Local Development
 
@@ -195,6 +211,10 @@ npm run dev                 # http://localhost:3000
 Default login: `admin` / `admin123` (set in `backend/.env` — change before any shared
 use; see `backend/.env.example`-style comments in `backend/.env` for the AI provider
 and Claude CLI options).
+
+**Tests** — `cd backend && pytest` (spins up its own throwaway SQLite DB, no setup
+needed) and `npm test` (Vitest) from the repo root. Both run in CI on every push/PR to
+`main` (`.github/workflows/ci.yml`), alongside `npm run lint` and `npm run build`.
 
 **Before production:** rotate the admin password, switch to Postgres, and put this
 behind HTTPS (`JWT_SECRET` is already a random secret and `/api/auth/login` already

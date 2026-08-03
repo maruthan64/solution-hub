@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Form, Input, message, Modal, Select, Upload } from "antd";
 import { InboxOutlined } from "@ant-design/icons";
 import type { UploadFile } from "antd/es/upload/interface";
@@ -31,10 +31,12 @@ export default function NewProjectModal({
   open,
   onClose,
   onCreated,
+  initialValues,
 }: {
   open: boolean;
   onClose: () => void;
   onCreated: (project: Project) => void;
+  initialValues?: Partial<NewProjectForm>;
 }) {
   const [form] = Form.useForm<NewProjectForm>();
   const { data: templates } = useApi(getTemplates);
@@ -42,6 +44,15 @@ export default function NewProjectModal({
   const [fileList, setFileList] = useState<UploadFile[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [messageApi, contextHolder] = message.useMessage();
+
+  useEffect(() => {
+    if (!open || !initialValues) return;
+    const cleaned = Object.fromEntries(
+      Object.entries(initialValues).filter(([, v]) => typeof v === "string" && v.trim().length > 0),
+    );
+    if (Object.keys(cleaned).length > 0) form.setFieldsValue(cleaned);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, initialValues]);
 
   const handleClose = () => {
     form.resetFields();

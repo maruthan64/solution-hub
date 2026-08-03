@@ -1,6 +1,7 @@
 import uuid
 
 from app.models import GeneratedDocument, Project
+from app.routers import chat as chat_router
 
 
 class TestHealth:
@@ -219,3 +220,30 @@ class TestCostEstimate:
         client.post("/api/auth/login", json={"username": user.username, "password": password})
         resp = client.post(f"/api/projects/{project.id}/cost-estimate", json={"packageIds": ["whatever"]})
         assert resp.status_code == 403
+
+
+class TestChatExtractProject:
+    def test_extracts_project_fields_from_conversation(self, auth_client, monkeypatch):
+        extracted = {"name": "Acme Migration", "customer": "Acme Corp", "cloud": "AWS", "description": "Lift and shift."}
+        monkeypatch.setattr(chat_router, "extract_project_from_chat", lambda messages, provider: extracted)
+
+        resp = auth_client.post(
+            "/api/chat/extract-project",
+            json={"messages": [{"role": "user", "content": "We're moving Acme Corp to AWS"}]},
+        )
+        assert resp.status_code == 200
+        assert resp.json() == extracted
+
+    def test_requires_at_least_one_message(self, auth_client):
+        resp = auth_client.post("/api/chat/extract-project", json={"messages": []})
+        assert resp.status_code == 400
+
+    def test_ai_failure_returns_502(self, auth_client, monkeypatch):
+        def _raise(messages, provider):
+            raise RuntimeError("provider unavailable")
+
+        monkeypatch.setattr(chat_router, "extract_project_from_chat", _raise)
+        resp = auth_client.post(
+            "/api/chat/extract-project", json={"messages": [{"role": "user", "content": "hi"}]}
+        )
+        assert resp.status_code == 502

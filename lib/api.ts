@@ -238,6 +238,16 @@ export interface ChatMessage {
 export const sendChatMessage = (messages: ChatMessage[]) =>
   apiFetch<{ reply: string }>("/api/chat", { method: "POST", body: JSON.stringify({ messages }) });
 
+export interface ProjectExtraction {
+  name: string;
+  customer: string;
+  cloud: string;
+  description: string;
+}
+
+export const extractProjectFromChat = (messages: ChatMessage[]) =>
+  apiFetch<ProjectExtraction>("/api/chat/extract-project", { method: "POST", body: JSON.stringify({ messages }) });
+
 export interface CapabilityInput {
   name: string;
   cloud: string;
