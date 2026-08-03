@@ -66,6 +66,19 @@ class TemplateAssistResponse(BaseModel):
     suggestion: str
 
 
+class DiagramOut(BaseModel):
+    xml: str
+    hasImage: bool
+
+
+class DiagramSaveRequest(BaseModel):
+    xml: str
+
+
+class DiagramAssistResponse(BaseModel):
+    xml: str
+
+
 class ChatMessageIn(BaseModel):
     role: str
     content: str
@@ -136,11 +149,32 @@ class ServicePackageUpdate(BaseModel):
     resources: list[ResourceLine]
 
 
+class ServicePackageCreate(BaseModel):
+    category: str  # "tier" | "container" | "addon"
+    name: str = Field(min_length=1)
+    tagline: str = Field(min_length=1)
+    monthlyPrice: str = Field(min_length=1)
+    resources: list[ResourceLine] = []
+
+
 class QuoteRequest(BaseModel):
     customerName: str = Field(min_length=1)
     description: str = Field(min_length=1)
     packageIds: list[str]
     format: str = "docx"  # "docx" | "pdf" | "proposal"
+    projectId: str | None = None
+
+
+class QuoteOut(BaseModel):
+    id: str
+    projectId: str
+    customerName: str
+    description: str
+    packageIds: list[str]
+    total: str
+    format: str
+    created: str
+    createdBy: str
 
 
 class KnowledgeDocOut(BaseModel):

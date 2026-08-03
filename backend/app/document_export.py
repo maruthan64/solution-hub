@@ -1,15 +1,16 @@
 import re
 from datetime import date
 from io import BytesIO
-from typing import TypedDict
+from typing import Callable, TypedDict
 
 from docx import Document
 from docx.enum.table import WD_TABLE_ALIGNMENT
-from docx.shared import Pt
+from docx.shared import Inches, Pt
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import letter
 from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.lib.units import inch
+from reportlab.platypus import Image as RLImage
 from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 
 PRICE_PATTERN = re.compile(r"[\d.]+")
@@ -324,6 +325,7 @@ def build_quote_proposal_pdf(customer_name: str, description: str, packages: lis
 BOLD_PATTERN = re.compile(r"\*\*(.+?)\*\*")
 HEADING_PATTERN = re.compile(r"^(#{1,4})\s+(.*)$")
 CHECKBOX_PATTERN = re.compile(r"^- \[([ xX])\]\s+(.*)$")
+IMAGE_PATTERN = re.compile(r"^!\[(.*?)\]\((.*?)\)$")
 
 
 def _add_inline_runs(paragraph, text: str) -> None:
@@ -339,7 +341,9 @@ def _add_inline_runs(paragraph, text: str) -> None:
         paragraph.add_run(text[pos:])
 
 
-def markdown_to_docx(title: str, markdown_text: str) -> bytes:
+def markdown_to_docx(
+    title: str, markdown_text: str, resolve_image: Callable[[str], bytes | None] | None = None
+) -> bytes:
     """Convert our stored Markdown template content into a real .docx.
 
     Headings map to Word's built-in Heading 1-4 styles (not just bold text) —
@@ -411,6 +415,16 @@ def markdown_to_docx(title: str, markdown_text: str) -> bytes:
             document.add_heading(heading_match.group(2), level=level)
             continue
 
+        image_match = IMAGE_PATTERN.match(stripped)
+        if image_match:
+            img_bytes = resolve_image(image_match.group(2)) if resolve_image else None
+            if img_bytes:
+                document.add_picture(BytesIO(img_bytes), width=Inches(6))
+            else:
+                p = document.add_paragraph()
+                _add_inline_runs(p, stripped)
+            continue
+
         checkbox_match = CHECKBOX_PATTERN.match(stripped)
         if checkbox_match:
             box = "☑" if checkbox_match.group(1).lower() == "x" else "☐"
@@ -444,7 +458,9 @@ def _bold_to_reportlab(text: str) -> str:
     return "".join(out)
 
 
-def markdown_to_pdf(title: str, markdown_text: str) -> bytes:
+def markdown_to_pdf(
+    title: str, markdown_text: str, resolve_image: Callable[[str], bytes | None] | None = None
+) -> bytes:
     """Same parsing as markdown_to_docx, rendered as a PDF via reportlab."""
     buffer = BytesIO()
     doc = SimpleDocTemplate(
@@ -537,6 +553,17 @@ def markdown_to_pdf(title: str, markdown_text: str) -> bytes:
         if heading_match:
             level = min(len(heading_match.group(1)), 4)
             story.append(Paragraph(_bold_to_reportlab(heading_match.group(2)), heading_styles[level]))
+            continue
+
+        image_match = IMAGE_PATTERN.match(stripped)
+        if image_match:
+            img_bytes = resolve_image(image_match.group(2)) if resolve_image else None
+            if img_bytes:
+                story.append(RLImage(BytesIO(img_bytes), width=6.5 * inch, height=8 * inch, kind="proportional"))
+                story.append(Spacer(1, 0.15 * inch))
+            else:
+                story.append(Paragraph(_bold_to_reportlab(stripped), styles["Normal"]))
+                story.append(Spacer(1, 0.05 * inch))
             continue
 
         checkbox_match = CHECKBOX_PATTERN.match(stripped)

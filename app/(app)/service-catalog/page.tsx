@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import {
   Alert,
@@ -26,6 +26,7 @@ import {
   FilePdfOutlined,
   FileTextOutlined,
   FileWordOutlined,
+  PlusOutlined,
   ShoppingCartOutlined,
   StarFilled,
 } from "@ant-design/icons";
@@ -33,6 +34,7 @@ import { generateQuote, getServiceCatalog, QuoteFormat } from "@/lib/api";
 import { useApi } from "@/lib/useApi";
 import { ServicePackage } from "@/lib/types";
 import { getPackageTheme } from "@/lib/serviceCatalogTheme";
+import NewServicePackageModal from "@/components/NewServicePackageModal";
 
 const { Title, Text, Paragraph } = Typography;
 const { TextArea } = Input;
@@ -295,7 +297,8 @@ function CompareModal({
 }
 
 export default function ServiceCatalogPage() {
-  const { data: packages, loading } = useApi(getServiceCatalog);
+  const { data: packages, loading, refetch } = useApi(getServiceCatalog);
+  const [newPackageOpen, setNewPackageOpen] = useState(false);
   const [cart, setCart] = useState<string[]>([]);
   const [compareIds, setCompareIds] = useState<string[]>([]);
   const [compareModalOpen, setCompareModalOpen] = useState(false);
@@ -304,7 +307,19 @@ export default function ServiceCatalogPage() {
   const [description, setDescription] = useState("");
   const [format, setFormat] = useState<QuoteFormat>("docx");
   const [generating, setGenerating] = useState(false);
+  const [projectId, setProjectId] = useState<string | null>(null);
+  const [projectName, setProjectName] = useState<string | null>(null);
   const [messageApi, contextHolder] = message.useMessage();
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const fromProject = params.get("projectId");
+    const customer = params.get("customer");
+    const project = params.get("project");
+    if (fromProject) setProjectId(fromProject);
+    if (project) setProjectName(project);
+    if (customer) setCustomerName(customer);
+  }, []);
 
   if (loading || !packages) {
     return (
@@ -338,7 +353,7 @@ export default function ServiceCatalogPage() {
     if (!canGenerate) return;
     setGenerating(true);
     try {
-      const blob = await generateQuote(customerName, description, cart, format);
+      const blob = await generateQuote(customerName, description, cart, format, projectId ?? undefined);
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       const ext = format === "docx" ? "docx" : "pdf";
@@ -346,7 +361,7 @@ export default function ServiceCatalogPage() {
       a.download = `Quote_${(customerName || "Customer").replace(/[^A-Za-z0-9_-]+/g, "_")}.${ext}`;
       a.click();
       URL.revokeObjectURL(url);
-      messageApi.success("Quote downloaded.");
+      messageApi.success(projectId ? "Quote downloaded and saved to the project." : "Quote downloaded.");
     } catch (err) {
       messageApi.error(err instanceof Error ? err.message : "Failed to generate quote.");
     } finally {
@@ -374,15 +389,29 @@ export default function ServiceCatalogPage() {
   return (
     <div className="flex flex-col gap-4" style={{ paddingBottom: cart.length > 0 ? 260 : 0 }}>
       {contextHolder}
-      <div>
-        <Title level={3} style={{ marginBottom: 0 }}>
-          Service Catalog
-        </Title>
-        <Text type="secondary">
-          Productized offerings sold as a service — click a card for full details, add the ones a customer wants to
-          the cart, then generate a quote.
-        </Text>
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <Title level={3} style={{ marginBottom: 0 }}>
+            Service Catalog
+          </Title>
+          <Text type="secondary">
+            Productized offerings sold as a service — click a card for full details, add the ones a customer wants
+            to the cart, then generate a quote.
+          </Text>
+        </div>
+        <Button type="primary" icon={<PlusOutlined />} onClick={() => setNewPackageOpen(true)}>
+          New Package
+        </Button>
       </div>
+
+      {projectId && (
+        <Alert
+          type="success"
+          showIcon
+          message={`Generating a quote for ${projectName ?? "this project"}`}
+          description="The customer name has been pre-filled, and this quote will be saved to the project's Quotes list once generated."
+        />
+      )}
 
       <Alert
         type="info"
@@ -510,6 +539,12 @@ export default function ServiceCatalogPage() {
         onToggleCart={(add) => detailsId && toggleCart(detailsId, add)}
       />
       <CompareModal packages={comparePackages} open={compareModalOpen} onClose={() => setCompareModalOpen(false)} />
+
+      <NewServicePackageModal
+        open={newPackageOpen}
+        onClose={() => setNewPackageOpen(false)}
+        onCreated={() => refetch()}
+      />
     </div>
   );
 }

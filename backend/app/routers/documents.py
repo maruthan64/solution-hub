@@ -1,3 +1,4 @@
+import os
 import re
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -9,7 +10,7 @@ from app.audit import log_action
 from app.auth import require_role, require_user
 from app.database import get_db
 from app.document_export import markdown_to_docx, markdown_to_pdf
-from app.models import AppSettings, GeneratedDocument, User
+from app.models import AppSettings, DocumentDiagram, GeneratedDocument, User
 from app.schemas import DocumentOut, ReviewNoteRequest, TemplateAssistRequest, TemplateAssistResponse, TemplateUpdate
 
 router = APIRouter(prefix="/api/documents", tags=["documents"])
@@ -17,6 +18,25 @@ router = APIRouter(prefix="/api/documents", tags=["documents"])
 STATUS_DRAFT = "Draft"
 STATUS_IN_REVIEW = "In Review"
 STATUS_APPROVED = "Approved"
+
+DIAGRAM_IMAGE_URL_PATTERN = re.compile(r"^/api/documents/([^/]+)/diagram/image$")
+
+
+def _resolve_diagram_image(db: Session):
+    """Bridge an embedded `![...](/api/documents/{id}/diagram/image)` markdown line to real
+    bytes for export — same process, so this reads straight off disk rather than over HTTP."""
+
+    def resolver(url: str) -> bytes | None:
+        match = DIAGRAM_IMAGE_URL_PATTERN.match(url)
+        if not match:
+            return None
+        diagram = db.get(DocumentDiagram, match.group(1))
+        if not diagram or not diagram.png_path or not os.path.isfile(diagram.png_path):
+            return None
+        with open(diagram.png_path, "rb") as f:
+            return f.read()
+
+    return resolver
 
 
 @router.get("", response_model=list[DocumentOut])
@@ -152,16 +172,17 @@ def export_document(
         raise HTTPException(status_code=400, detail="format must be 'docx' or 'pdf'")
 
     safe_name = re.sub(r"[^A-Za-z0-9_-]+", "_", doc.title).strip("_")
+    resolve_image = _resolve_diagram_image(db)
 
     if format == "pdf":
         return Response(
-            content=markdown_to_pdf(doc.title, doc.content),
+            content=markdown_to_pdf(doc.title, doc.content, resolve_image=resolve_image),
             media_type="application/pdf",
             headers={"Content-Disposition": f'attachment; filename="{safe_name}.pdf"'},
         )
 
     return Response(
-        content=markdown_to_docx(doc.title, doc.content),
+        content=markdown_to_docx(doc.title, doc.content, resolve_image=resolve_image),
         media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
         headers={"Content-Disposition": f'attachment; filename="{safe_name}.docx"'},
     )

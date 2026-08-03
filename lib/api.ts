@@ -7,6 +7,7 @@ import type {
   GeneratedDocument,
   KnowledgeDoc,
   Project,
+  Quote,
   ServicePackage,
 } from "@/lib/types";
 
@@ -56,6 +57,27 @@ export const requestDocumentChanges = (id: string, note: string) =>
     method: "POST",
     body: JSON.stringify({ note }),
   });
+
+export interface DocumentDiagram {
+  xml: string;
+  hasImage: boolean;
+}
+
+export const getDocumentDiagram = (id: string) => apiFetch<DocumentDiagram>(`/api/documents/${id}/diagram`);
+export const saveDocumentDiagram = (id: string, xml: string) =>
+  apiFetch<DocumentDiagram>(`/api/documents/${id}/diagram`, { method: "PUT", body: JSON.stringify({ xml }) });
+export const assistDocumentDiagram = (id: string, instruction: string) =>
+  apiFetch<{ xml: string }>(`/api/documents/${id}/diagram/assist`, {
+    method: "POST",
+    body: JSON.stringify({ instruction }),
+  });
+export function uploadDiagramImage(id: string, file: Blob): Promise<DocumentDiagram> {
+  const form = new FormData();
+  form.set("file", file, "diagram.png");
+  return postForm<DocumentDiagram>(`/api/documents/${id}/diagram/image`, form, "Failed to save diagram image");
+}
+export const diagramImageUrl = (id: string) => `/api/documents/${id}/diagram/image`;
+
 export const getTemplates = () => apiFetch<DocTemplate[]>("/api/templates");
 export const getTemplate = (id: string) => apiFetch<DocTemplate>(`/api/templates/${id}`);
 export const updateTemplate = (id: string, content: string) =>
@@ -119,6 +141,7 @@ export function createProject(input: NewProjectInput): Promise<Project> {
 }
 
 export const deleteProject = (id: string) => apiFetch<{ ok: boolean }>(`/api/projects/${id}`, { method: "DELETE" });
+export const getProjectQuotes = (id: string) => apiFetch<Quote[]>(`/api/projects/${id}/quotes`);
 
 export interface NewTemplateInput {
   name: string;
@@ -176,6 +199,8 @@ export const getServiceCatalog = () => apiFetch<ServicePackage[]>("/api/service-
 export const getServicePackage = (id: string) => apiFetch<ServicePackage>(`/api/service-catalog/${id}`);
 export const updateServicePackage = (id: string, input: Omit<ServicePackage, "id" | "category">) =>
   apiFetch<ServicePackage>(`/api/service-catalog/${id}`, { method: "PUT", body: JSON.stringify(input) });
+export const createServicePackage = (input: Omit<ServicePackage, "id">) =>
+  apiFetch<ServicePackage>("/api/service-catalog", { method: "POST", body: JSON.stringify(input) });
 
 export type QuoteFormat = "docx" | "pdf" | "proposal";
 
@@ -184,11 +209,12 @@ export async function generateQuote(
   description: string,
   packageIds: string[],
   format: QuoteFormat,
+  projectId?: string,
 ): Promise<Blob> {
   const res = await fetch("/api/service-catalog/quote", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ customerName, description, packageIds, format }),
+    body: JSON.stringify({ customerName, description, packageIds, format, projectId: projectId ?? null }),
   });
 
   if (!res.ok) {

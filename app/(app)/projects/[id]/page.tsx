@@ -4,8 +4,14 @@ import { use, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Button, Card, Col, Popconfirm, Row, Space, Spin, Tag, Table, Typography, message } from "antd";
-import { ArrowLeftOutlined, DeleteOutlined, FileTextOutlined, MessageOutlined } from "@ant-design/icons";
-import { deleteProject, getDocuments, getProject } from "@/lib/api";
+import {
+  ArrowLeftOutlined,
+  DeleteOutlined,
+  FileTextOutlined,
+  MessageOutlined,
+  ShoppingCartOutlined,
+} from "@ant-design/icons";
+import { deleteProject, getDocuments, getProject, getProjectQuotes } from "@/lib/api";
 import { useApi } from "@/lib/useApi";
 import { ProjectStatus } from "@/lib/types";
 import { CloudProviderIcon } from "@/components/icons/CloudIcons";
@@ -24,10 +30,11 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
   const router = useRouter();
   const { data: project, loading: projectLoading } = useApi(() => getProject(id), [id]);
   const { data: documents, loading: documentsLoading } = useApi(getDocuments);
+  const { data: quotes, loading: quotesLoading } = useApi(() => getProjectQuotes(id), [id]);
   const [deleting, setDeleting] = useState(false);
   const [messageApi, contextHolder] = message.useMessage();
 
-  if (projectLoading || documentsLoading || !project || !documents) {
+  if (projectLoading || documentsLoading || quotesLoading || !project || !documents || !quotes) {
     return (
       <div className="flex justify-center py-20">
         <Spin size="large" />
@@ -75,6 +82,11 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
               Delete
             </Button>
           </Popconfirm>
+          <Link
+            href={`/service-catalog?projectId=${id}&project=${encodeURIComponent(project.name)}&customer=${encodeURIComponent(project.customer)}`}
+          >
+            <Button icon={<ShoppingCartOutlined />}>Generate Quote</Button>
+          </Link>
           <Link href="/chat">
             <Button type="primary" icon={<MessageOutlined />}>
               Continue in AI Chat
@@ -160,6 +172,23 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
             { title: "Version", dataIndex: "version" },
             { title: "Status", dataIndex: "status" },
             { title: "Updated", dataIndex: "updated" },
+          ]}
+        />
+      </Card>
+
+      <Card title="Quotes">
+        <Table
+          rowKey="id"
+          dataSource={quotes}
+          pagination={false}
+          locale={{ emptyText: "No quotes generated for this project yet — use Generate Quote above." }}
+          columns={[
+            { title: "Customer", dataIndex: "customerName" },
+            { title: "Packages", dataIndex: "packageIds", render: (ids: string[]) => ids.length },
+            { title: "Total", dataIndex: "total" },
+            { title: "Format", dataIndex: "format", render: (f: string) => <Tag>{f.toUpperCase()}</Tag> },
+            { title: "Generated", dataIndex: "created" },
+            { title: "By", dataIndex: "createdBy" },
           ]}
         />
       </Card>

@@ -82,6 +82,18 @@ export interface ServicePackage {
   resources: ResourceLine[];
 }
 
+export interface Quote {
+  id: string;
+  projectId: string;
+  customerName: string;
+  description: string;
+  packageIds: string[];
+  total: string;
+  format: string;
+  created: string;
+  createdBy: string;
+}
+
 export interface CaseStudy {
   customer: string;
   outcome: string;

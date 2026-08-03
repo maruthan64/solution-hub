@@ -66,6 +66,18 @@ class DocTemplate(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=now, onupdate=now)
 
 
+class DocumentDiagram(Base):
+    """A single architecture diagram (mxGraph/draw.io XML) attached to a GeneratedDocument.
+    One per document — png_path is a stable, document_id-keyed file re-rendered on every save."""
+
+    __tablename__ = "document_diagrams"
+
+    document_id: Mapped[str] = mapped_column(String(32), primary_key=True)
+    xml: Mapped[str] = mapped_column(Text, default="")
+    png_path: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    updated_at: Mapped[str] = mapped_column(String(32), default="")
+
+
 class KnowledgeDoc(Base):
     __tablename__ = "knowledge_docs"
 
@@ -109,6 +121,23 @@ class ServicePackage(Base):
     tagline: Mapped[str] = mapped_column(String(300))
     monthly_price: Mapped[str] = mapped_column(String(32))
     resources: Mapped[list] = mapped_column(JSON)  # [{service, quantity, purpose}, ...]
+
+
+class Quote(Base):
+    """A generated Service Catalog quote, snapshotted and linked back to the Project it was
+    generated for — the pricing-side counterpart to a Project's Generated Documents."""
+
+    __tablename__ = "quotes"
+
+    id: Mapped[str] = mapped_column(String(32), primary_key=True)
+    project_id: Mapped[str] = mapped_column(String(32))
+    customer_name: Mapped[str] = mapped_column(String(200))
+    description: Mapped[str] = mapped_column(Text, default="")
+    package_ids: Mapped[list] = mapped_column(JSON)
+    total: Mapped[str] = mapped_column(String(32))
+    format: Mapped[str] = mapped_column(String(16))
+    created: Mapped[str] = mapped_column(String(32))
+    created_by: Mapped[str] = mapped_column(String(120))
 
 
 class Capability(Base):

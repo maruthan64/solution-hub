@@ -12,6 +12,7 @@ from app.routers import (
     auth,
     capabilities,
     chat,
+    diagrams,
     documents,
     knowledge_base,
     mcp_connectors,
@@ -39,6 +40,7 @@ app.include_router(auth.router)
 app.include_router(chat.router)
 app.include_router(projects.router)
 app.include_router(documents.router)
+app.include_router(diagrams.router)
 app.include_router(templates.router)
 app.include_router(knowledge_base.router)
 app.include_router(users.router)

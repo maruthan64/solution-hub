@@ -9,8 +9,8 @@ from app.ai_assist import draft_content
 from app.audit import log_action
 from app.auth import require_role, require_user
 from app.database import get_db
-from app.models import AppSettings, Capability, DocTemplate, GeneratedDocument, Project, User
-from app.schemas import ProjectOut
+from app.models import AppSettings, Capability, DocTemplate, GeneratedDocument, Project, Quote, User
+from app.schemas import ProjectOut, QuoteOut
 
 router = APIRouter(prefix="/api/projects", tags=["projects"])
 
@@ -68,6 +68,27 @@ def get_project(project_id: str, db: Session = Depends(get_db), _user: str = Dep
     if not p:
         raise HTTPException(status_code=404, detail="Project not found")
     return to_out(p, db)
+
+
+@router.get("/{project_id}/quotes", response_model=list[QuoteOut])
+def list_project_quotes(project_id: str, db: Session = Depends(get_db), _user: str = Depends(require_user)):
+    if not db.get(Project, project_id):
+        raise HTTPException(status_code=404, detail="Project not found")
+    quotes = db.query(Quote).filter(Quote.project_id == project_id).order_by(Quote.created.desc()).all()
+    return [
+        QuoteOut(
+            id=q.id,
+            projectId=q.project_id,
+            customerName=q.customer_name,
+            description=q.description,
+            packageIds=q.package_ids,
+            total=q.total,
+            format=q.format,
+            created=q.created,
+            createdBy=q.created_by,
+        )
+        for q in quotes
+    ]
 
 
 @router.post("", response_model=ProjectOut, status_code=201)

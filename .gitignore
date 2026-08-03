@@ -10,3 +10,6 @@ backend/*.db
 backend/uploads/
 
 .claude/settings.local.json
+
+*.log
+tsconfig.tsbuildinfo

@@ -4,6 +4,7 @@ import { use, useEffect, useState } from "react";
 import Link from "next/link";
 import { Alert, Button, Card, Input, Modal, Space, Spin, Tag, Typography, message } from "antd";
 import {
+  ApartmentOutlined,
   ArrowLeftOutlined,
   CheckCircleOutlined,
   EditOutlined,
@@ -26,6 +27,7 @@ import {
 } from "@/lib/api";
 import { useApi } from "@/lib/useApi";
 import { DocumentPreviewModal } from "@/components/DocumentPreviewModal";
+import DiagramEditorModal from "@/components/DiagramEditorModal";
 import { DocStatus } from "@/lib/types";
 
 const { Title, Text, Paragraph } = Typography;
@@ -61,6 +63,7 @@ export default function DocumentEditPage({ params }: { params: Promise<{ id: str
   const [asking, setAsking] = useState(false);
   const [exporting, setExporting] = useState<"docx" | "pdf" | null>(null);
   const [previewOpen, setPreviewOpen] = useState(false);
+  const [diagramOpen, setDiagramOpen] = useState(false);
   const [workflowBusy, setWorkflowBusy] = useState(false);
   const [changesModalOpen, setChangesModalOpen] = useState(false);
   const [changesNote, setChangesNote] = useState("");
@@ -196,6 +199,11 @@ export default function DocumentEditPage({ params }: { params: Promise<{ id: str
     }
   };
 
+  const handleInsertDiagram = (url: string) => {
+    const line = `![Architecture Diagram](${url})`;
+    setContent((c) => (c.includes(url) ? c : `${c.replace(/\n+$/, "")}\n\n${line}\n`));
+  };
+
   const handleDownloadMarkdown = () => {
     const blob = new Blob([content], { type: "text/markdown" });
     const url = URL.createObjectURL(blob);
@@ -231,6 +239,9 @@ export default function DocumentEditPage({ params }: { params: Promise<{ id: str
           <Tag color={STATUS_COLOR[docStatus]}>{docStatus}</Tag>
           <Button icon={<EyeOutlined />} onClick={() => setPreviewOpen(true)}>
             Preview
+          </Button>
+          <Button icon={<ApartmentOutlined />} onClick={() => setDiagramOpen(true)}>
+            Diagram
           </Button>
           <Button icon={<FileMarkdownOutlined />} onClick={handleDownloadMarkdown}>
             Markdown
@@ -378,6 +389,13 @@ export default function DocumentEditPage({ params }: { params: Promise<{ id: str
         onExportPdf={() => handleExport("pdf")}
         exportingWord={exporting === "docx"}
         exportingPdf={exporting === "pdf"}
+      />
+
+      <DiagramEditorModal
+        open={diagramOpen}
+        documentId={id}
+        onClose={() => setDiagramOpen(false)}
+        onInsert={handleInsertDiagram}
       />
 
       <Modal
