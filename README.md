@@ -49,31 +49,44 @@ instruction (e.g. *"Fill in the Cost Estimate assumptions for a 3-node cluster"*
 **Ask AI**, then **Append to editor** or **Replace all** the suggestion. Nothing is saved
 until you click **Save Changes**.
 
-**4. Preview before sharing** — the **Preview** button renders the Markdown as it will
-actually look (headings, tables, bold), so you can sanity-check before exporting.
-**Markdown** downloads the raw file client-side; **Word**/**PDF** hit the backend and
-auto-save any unsaved edits first, so the export always matches what's on screen.
-Templates support the same Preview/AI-Assist/export flow — they're just your org's
-reusable starting point, not a customer deliverable, so they skip the review workflow.
+**4. Add an architecture diagram** — click **Diagram** on a document to open an
+embedded draw.io (diagrams.net) canvas. **Ask AI to draft** generates a starting
+diagram using real AWS/Azure/GCP icons based on the project's cloud; hand-edit it like
+any normal draw.io diagram, **Save** to persist it, then **Insert into document** to drop
+it into the Markdown as an image (it lands at the end of the content — move the line
+manually if you want it under a specific heading). Word/PDF export renders it as a real
+embedded picture, not a broken link.
 
-**5. Review and approve a document** — documents move through `Draft → In Review →
+**5. Preview before sharing** — the **Preview** button renders the Markdown as it will
+actually look (headings, tables, bold, embedded diagrams), so you can sanity-check
+before exporting. **Markdown** downloads the raw file client-side; **Word**/**PDF** hit
+the backend and auto-save any unsaved edits first, so the export always matches what's
+on screen. Templates support the same Preview/AI-Assist/export flow — they're just your
+org's reusable starting point, not a customer deliverable, so they skip the review
+workflow.
+
+**6. Review and approve a document** — documents move through `Draft → In Review →
 Approved`. Owner/Architect can **Submit for Review**; Owner/Reviewer can then
 **Approve** or **Request Changes** (which requires a note and sends it back to Draft,
 showing that note as a banner until resubmitted). Editing an Approved or In-Review
-document automatically reverts it to Draft, so "Approved" always reflects reviewed
-content, never stale content.
+document automatically reverts it to Draft (this includes inserting/re-inserting a
+diagram), so "Approved" always reflects reviewed content, never stale content.
 
-**6. Build a quote** — Service Catalog → click a tier/add-on card for full resource
+**7. Build a quote** — Service Catalog → click a tier/add-on card for full resource
 details, **Add to Cart** the ones a customer wants, optionally **Compare** a couple side
 by side, then fill in Customer Name + Description and generate a Word/PDF/branded
-Proposal with a real computed total.
+Proposal with a real computed total. Use **New Package** to add a new Tier/Container/
+Add-On to the catalog (previously only editing existing ones was possible). Starting a
+quote from a project's **Generate Quote** button pre-fills the customer name and saves
+the quote to that project's **Quotes** table; quotes generated directly from
+`/service-catalog` are still one-off and not linked to anything.
 
-**7. Scope with AI Chat** — `/chat` is a real multi-turn conversation (via whichever AI
+**8. Scope with AI Chat** — `/chat` is a real multi-turn conversation (via whichever AI
 provider is selected in Settings) for talking through a solution before committing to a
 project. It's discussion-only — it doesn't create a project or document for you, so once
 you know what you need, go create the project from a matching template (step 2).
 
-**8. Everything else** — Knowledge Base (upload/download org standards), Users (invite
+**9. Everything else** — Knowledge Base (upload/download org standards), Users (invite
 teammates, sets their role), Connectors (manage real Claude Code MCP servers), Audit
 Logs (a real log of every write action), Settings (AI provider, org info, API key).
 
@@ -117,19 +130,25 @@ FastAPI (:8000)
   ├── subprocess `claude -p`                                 (AI Assistant: claude_cli mode)
   ├── subprocess `claude mcp ...`                             (Connectors page)
   ├── python-docx / reportlab ──▶ generated .docx / .pdf      (Templates, Documents, Quotes)
-  └── local disk (backend/uploads/) ──▶ Project & Knowledge Base file uploads
+  └── local disk (backend/uploads/) ──▶ Project & Knowledge Base file uploads,
+                                          rendered diagram PNGs (uploads/diagrams/)
+
+Browser also embeds https://embed.diagrams.net directly (draw.io, Apache-2.0,
+free for internal use) as an iframe for the Diagram editor — the canvas itself
+runs entirely client-side; only Save/AI-draft/PNG-export round-trip to the backend.
 ```
 
 **A typical session:**
 1. Log in → backend issues a JWT cookie.
 2. Pick a Template or Document, optionally ask the AI Assistant to draft a section
-   (routed through LiteLLM or the local Claude CLI, whichever Settings selects) →
-   export to Word or PDF.
+   (routed through LiteLLM or the local Claude CLI, whichever Settings selects), add an
+   AI-drafted/hand-edited architecture diagram → export to Word or PDF.
 3. Or: build a quote in the Service Catalog — add tiers/add-ons to the cart, fill in
    customer name + description, generate a Word/PDF/branded-Proposal quote with a
-   real computed total.
-4. Every meaningful write (login, template edit, quote generated, file uploaded, user
-   invited, etc.) writes a real row to Audit Logs — nothing there is static seed data.
+   real computed total, optionally linked back to a Project.
+4. Every meaningful write (login, template edit, quote generated, diagram saved, file
+   uploaded, user invited, etc.) writes a real row to Audit Logs — nothing there is
+   static seed data.
 
 ## Status: what's real vs. not yet
 
@@ -137,19 +156,26 @@ Built and verified end-to-end (tested against the actual running backend, not ju
 templates, document/quote export (Word + PDF + branded Proposal), rendered Preview
 before export, document review/approval workflow (Draft → In Review → Approved, with
 request-changes notes and auto-revert on edit), Service Catalog + cart + quote
-generation, Knowledge Base upload/download/delete, Settings (org info + API key
-rotation, masked), Users (real invite issuing a login-capable account), role-based
-access control, Connectors (reflects and manages real Claude Code MCP servers), audit
-logging, AI Chat (real multi-turn conversation via the same LiteLLM/Claude CLI provider
-selected in Settings).
+generation + package creation, Knowledge Base upload/download/delete, Settings (org
+info + API key rotation, masked), Users (real invite issuing a login-capable account),
+role-based access control, Connectors (reflects and manages real Claude Code MCP
+servers), audit logging, AI Chat (real multi-turn conversation via the same
+LiteLLM/Claude CLI provider selected in Settings), architecture diagram generation
+(AI-drafted via draw.io embed, hand-editable, embeds as a real image in Word/PDF
+exports), and Service Catalog quotes linked back to a Project.
 
 **Not yet real:**
 - No pipeline connects Projects → AI Chat → generated Documents. AI Chat is
   conversational only — it doesn't turn a conversation into a project or document yet;
-  that still requires creating a project from a template. Templates, Documents,
-  Projects, and Service Catalog are wired individually but not chained together.
-- No Diagram Generator or automated Cost Estimator beyond the fixed Service Catalog
-  pricing.
+  that still requires creating a project from a template. Templates and Documents are
+  now chained to Diagrams and (optionally) Service Catalog quotes, but Projects → AI
+  Chat is still disconnected.
+- No automated Cost Estimator beyond the fixed Service Catalog pricing.
+- Inserting a diagram into a document always appends it at the end of the content —
+  there's no "insert at cursor" or "insert under this heading."
+- Quotes generated directly from `/service-catalog` (not opened via a project's
+  **Generate Quote** button) still aren't linked to any project.
+- No automated tests and no CI pipeline exist in this repo yet.
 
 ## Local Development
 
