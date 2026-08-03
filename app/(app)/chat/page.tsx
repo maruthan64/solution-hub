@@ -104,7 +104,7 @@ export default function ChatPage() {
         </div>
       </Card>
       <Paragraph type="secondary" className="text-xs">
-        This chat is for scoping and discussion — it doesn't generate documents directly. Once you know what you
+        This chat is for scoping and discussion — it doesn&apos;t generate documents directly. Once you know what you
         need, create a project from a matching template to generate a draft.
       </Paragraph>
     </div>

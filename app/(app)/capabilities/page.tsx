@@ -324,7 +324,7 @@ export default function CapabilitiesPage() {
           </Form.Item>
 
           <Divider orientation="left" orientationMargin={0} className="text-sm">
-            Proof points (optional — only add what's real)
+            Proof points (optional — only add what&apos;s real)
           </Divider>
 
           <Form.Item
