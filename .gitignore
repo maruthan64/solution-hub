@@ -1,0 +1,12 @@
+node_modules/
+.next/
+out/
+.env
+.env.local
+
+backend/venv/
+**/__pycache__/
+backend/*.db
+backend/uploads/
+
+.claude/settings.local.json
