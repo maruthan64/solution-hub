@@ -199,9 +199,29 @@ export default function DocumentEditPage({ params }: { params: Promise<{ id: str
     }
   };
 
-  const handleInsertDiagram = (url: string) => {
+  const handleInsertDiagram = (url: string, afterHeadingText: string | null) => {
     const line = `![Architecture Diagram](${url})`;
-    setContent((c) => (c.includes(url) ? c : `${c.replace(/\n+$/, "")}\n\n${line}\n`));
+    setContent((c) => {
+      // Strip any prior occurrence of this exact image line first, so re-inserting under a
+      // different heading moves it instead of leaving a stale duplicate behind.
+      const withoutOld = c
+        .split("\n")
+        .filter((l) => l.trim() !== line)
+        .join("\n");
+
+      if (!afterHeadingText) {
+        return `${withoutOld.replace(/\n+$/, "")}\n\n${line}\n`;
+      }
+
+      const lines = withoutOld.split("\n");
+      const idx = lines.findIndex((l) => l.trim() === afterHeadingText);
+      if (idx === -1) {
+        // The chosen heading was itself deleted/edited since the modal opened - fall back to append.
+        return `${withoutOld.replace(/\n+$/, "")}\n\n${line}\n`;
+      }
+      lines.splice(idx + 1, 0, "", line, "");
+      return lines.join("\n");
+    });
   };
 
   const handleDownloadMarkdown = () => {
@@ -394,6 +414,7 @@ export default function DocumentEditPage({ params }: { params: Promise<{ id: str
       <DiagramEditorModal
         open={diagramOpen}
         documentId={id}
+        documentContent={content}
         onClose={() => setDiagramOpen(false)}
         onInsert={handleInsertDiagram}
       />

@@ -142,6 +142,11 @@ export function createProject(input: NewProjectInput): Promise<Project> {
 
 export const deleteProject = (id: string) => apiFetch<{ ok: boolean }>(`/api/projects/${id}`, { method: "DELETE" });
 export const getProjectQuotes = (id: string) => apiFetch<Quote[]>(`/api/projects/${id}/quotes`);
+export const createCostEstimate = (projectId: string, packageIds: string[]) =>
+  apiFetch<GeneratedDocument>(`/api/projects/${projectId}/cost-estimate`, {
+    method: "POST",
+    body: JSON.stringify({ packageIds }),
+  });
 
 export interface NewTemplateInput {
   name: string;

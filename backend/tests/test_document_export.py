@@ -1,4 +1,11 @@
-from app.document_export import _bold_to_reportlab, _esc, markdown_to_docx, markdown_to_pdf, parse_monthly_price
+from app.document_export import (
+    _bold_to_reportlab,
+    _esc,
+    build_cost_estimate_markdown,
+    markdown_to_docx,
+    markdown_to_pdf,
+    parse_monthly_price,
+)
 
 
 class TestParseMonthlyPrice:
@@ -73,6 +80,36 @@ class TestMarkdownToDocx:
             resolve_image=lambda url: png_bytes,
         )
         assert len(result) > 0
+
+
+class TestBuildCostEstimateMarkdown:
+    def test_computes_total_across_packages(self):
+        packages = [
+            {"id": "a", "name": "Basic", "tagline": "Entry tier", "monthlyPrice": "$500/mo", "resources": []},
+            {"id": "b", "name": "Add-on", "tagline": "", "monthlyPrice": "$250.50/mo", "resources": []},
+        ]
+        md = build_cost_estimate_markdown(packages)
+        assert "$750.50/mo" in md
+        assert "## Basic" in md
+        assert "## Add-on" in md
+
+    def test_includes_resource_table_rows(self):
+        packages = [
+            {
+                "id": "a",
+                "name": "Basic",
+                "tagline": "",
+                "monthlyPrice": "$500/mo",
+                "resources": [{"service": "EC2 t3.large", "quantity": 3, "purpose": "App servers"}],
+            }
+        ]
+        md = build_cost_estimate_markdown(packages)
+        assert "EC2 t3.large" in md
+        assert "App servers" in md
+
+    def test_empty_package_list_produces_zero_total(self):
+        md = build_cost_estimate_markdown([])
+        assert "$0.00/mo" in md
 
 
 class TestMarkdownToPdf:

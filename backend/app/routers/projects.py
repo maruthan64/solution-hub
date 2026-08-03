@@ -9,8 +9,9 @@ from app.ai_assist import draft_content
 from app.audit import log_action
 from app.auth import require_role, require_user
 from app.database import get_db
-from app.models import AppSettings, Capability, DocTemplate, GeneratedDocument, Project, Quote, User
-from app.schemas import ProjectOut, QuoteOut
+from app.document_export import build_cost_estimate_markdown
+from app.models import AppSettings, Capability, DocTemplate, GeneratedDocument, Project, Quote, ServicePackage, User
+from app.schemas import CostEstimateRequest, DocumentOut, ProjectOut, QuoteOut
 
 router = APIRouter(prefix="/api/projects", tags=["projects"])
 
@@ -89,6 +90,67 @@ def list_project_quotes(project_id: str, db: Session = Depends(get_db), _user: s
         )
         for q in quotes
     ]
+
+
+@router.post("/{project_id}/cost-estimate", response_model=DocumentOut)
+def generate_cost_estimate(
+    project_id: str,
+    payload: CostEstimateRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_role("Owner", "Architect")),
+):
+    project = db.get(Project, project_id)
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+    if not payload.packageIds:
+        raise HTTPException(status_code=400, detail="Select at least one package for the cost estimate.")
+
+    packages = db.query(ServicePackage).filter(ServicePackage.id.in_(payload.packageIds)).all()
+    found_ids = {p.id for p in packages}
+    missing = set(payload.packageIds) - found_ids
+    if missing:
+        raise HTTPException(status_code=404, detail=f"Unknown package id(s): {', '.join(sorted(missing))}")
+
+    by_id = {p.id: p for p in packages}
+    ordered = [by_id[pid] for pid in payload.packageIds]
+    quote_packages = [
+        {"id": p.id, "name": p.name, "tagline": p.tagline, "monthlyPrice": p.monthly_price, "resources": p.resources}
+        for p in ordered
+    ]
+    content = build_cost_estimate_markdown(quote_packages)
+
+    existing = (
+        db.query(GeneratedDocument)
+        .filter(GeneratedDocument.project == project.name, GeneratedDocument.type == "Cost Estimate")
+        .first()
+    )
+
+    if existing:
+        existing.content = content
+        existing.updated = date.today().isoformat()
+        if existing.status != "Draft":
+            existing.status = "Draft"
+            existing.review_note = None
+        log_action(db, current_user.name, "Updated cost estimate", project.name)
+        db.commit()
+        db.refresh(existing)
+        return existing
+
+    doc = GeneratedDocument(
+        id=f"doc-{uuid.uuid4().hex[:8]}",
+        project=project.name,
+        type="Cost Estimate",
+        title=f"Cost Estimate - {project.name}",
+        version="v1.0",
+        updated=date.today().isoformat(),
+        status="Draft",
+        content=content,
+    )
+    db.add(doc)
+    log_action(db, current_user.name, "Generated cost estimate", project.name)
+    db.commit()
+    db.refresh(doc)
+    return doc
 
 
 @router.post("", response_model=ProjectOut, status_code=201)

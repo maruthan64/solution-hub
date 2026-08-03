@@ -165,6 +165,10 @@ class QuoteRequest(BaseModel):
     projectId: str | None = None
 
 
+class CostEstimateRequest(BaseModel):
+    packageIds: list[str]
+
+
 class QuoteOut(BaseModel):
     id: str
     projectId: str

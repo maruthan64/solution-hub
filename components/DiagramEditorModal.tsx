@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import { Button, Input, Modal, Space, Spin, message } from "antd";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Button, Input, Modal, Select, Space, Spin, message } from "antd";
 import { FileImageOutlined, RobotOutlined, SaveOutlined } from "@ant-design/icons";
 import {
   assistDocumentDiagram,
@@ -29,20 +29,38 @@ interface DiagramEditorModalProps {
   open: boolean;
   onClose: () => void;
   documentId: string;
-  onInsert: (url: string) => void;
+  documentContent: string;
+  onInsert: (url: string, afterHeadingText: string | null) => void;
 }
 
-export default function DiagramEditorModal({ open, onClose, documentId, onInsert }: DiagramEditorModalProps) {
+export default function DiagramEditorModal({
+  open,
+  onClose,
+  documentId,
+  documentContent,
+  onInsert,
+}: DiagramEditorModalProps) {
   const [loading, setLoading] = useState(true);
   const [ready, setReady] = useState(false);
   const [instruction, setInstruction] = useState("");
   const [asking, setAsking] = useState(false);
   const [saving, setSaving] = useState(false);
   const [inserting, setInserting] = useState(false);
+  const [insertUnder, setInsertUnder] = useState<string>("");
   const [messageApi, contextHolder] = message.useMessage();
+
+  const headings = useMemo(
+    () =>
+      documentContent
+        .split("\n")
+        .map((l) => l.trim())
+        .filter((l) => /^#{1,4}\s+/.test(l)),
+    [documentContent],
+  );
 
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const latestXmlRef = useRef<string>(BLANK_DIAGRAM_XML);
+  const insertUnderRef = useRef<string>("");
 
   const postToEditor = (msg: Record<string, unknown>) => {
     iframeRef.current?.contentWindow?.postMessage(JSON.stringify(msg), "*");
@@ -52,6 +70,8 @@ export default function DiagramEditorModal({ open, onClose, documentId, onInsert
     if (!open) return;
     setLoading(true);
     setReady(false);
+    setInsertUnder("");
+    insertUnderRef.current = "";
     getDocumentDiagram(documentId)
       .then((d) => {
         latestXmlRef.current = d.xml && d.xml.trim() ? d.xml : BLANK_DIAGRAM_XML;
@@ -92,7 +112,7 @@ export default function DiagramEditorModal({ open, onClose, documentId, onInsert
             const res = await fetch(dataUrl);
             const blob = await res.blob();
             await uploadDiagramImage(documentId, blob);
-            onInsert(diagramImageUrl(documentId));
+            onInsert(diagramImageUrl(documentId), insertUnderRef.current || null);
             messageApi.success("Diagram inserted into the document.");
             onClose();
           } catch (err) {
@@ -165,6 +185,19 @@ export default function DiagramEditorModal({ open, onClose, documentId, onInsert
           <Button icon={<SaveOutlined />} onClick={handleSave} loading={saving} disabled={!ready}>
             Save
           </Button>
+          <Select
+            value={insertUnder}
+            onChange={(v) => {
+              setInsertUnder(v);
+              insertUnderRef.current = v;
+            }}
+            style={{ width: 220 }}
+            disabled={!ready}
+            options={[
+              { value: "", label: "Insert at: end of document" },
+              ...headings.map((h) => ({ value: h, label: `Insert under: ${h}` })),
+            ]}
+          />
           <Button type="primary" icon={<FileImageOutlined />} onClick={handleInsert} loading={inserting} disabled={!ready}>
             Insert into document
           </Button>

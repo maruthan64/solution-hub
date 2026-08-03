@@ -30,6 +30,40 @@ class QuotePackage(TypedDict):
     resources: list[dict]
 
 
+def build_cost_estimate_markdown(packages: list[QuotePackage]) -> str:
+    """Build a Markdown cost estimate from real Service Catalog pricing data — one section
+    per selected package with its resource line items, closing with a computed total. This
+    feeds into a normal GeneratedDocument, so it renders through the same
+    markdown_to_docx/markdown_to_pdf path (and stays editable/AI-assistable) as any other
+    document, unlike the standalone quote builders below."""
+    lines = ["# Cost Estimate", ""]
+    total = 0.0
+
+    for pkg in packages:
+        lines.append(f"## {pkg['name']}")
+        lines.append("")
+        if pkg.get("tagline"):
+            lines.append(pkg["tagline"])
+            lines.append("")
+        resources = pkg.get("resources") or []
+        if resources:
+            lines.append("| Service | Qty | Purpose |")
+            lines.append("| --- | --- | --- |")
+            for r in resources:
+                lines.append(f"| {r.get('service', '')} | {r.get('quantity', '')} | {r.get('purpose', '')} |")
+            lines.append("")
+        subtotal = parse_monthly_price(pkg["monthlyPrice"])
+        total += subtotal
+        lines.append(f"**Subtotal: ${subtotal:,.2f}/mo**")
+        lines.append("")
+
+    lines.append("## Estimated Total")
+    lines.append("")
+    lines.append(f"**${total:,.2f}/mo**, based on current Service Catalog pricing for the packages above.")
+
+    return "\n".join(lines)
+
+
 # Mirrors lib/serviceCatalogTheme.ts on the frontend, so the branded proposal
 # PDF uses the same per-package accent colors as the Service Catalog cards.
 PACKAGE_ACCENTS = {

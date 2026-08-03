@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   Alert,
   Button,
@@ -20,6 +21,7 @@ import {
   message,
 } from "antd";
 import {
+  CalculatorOutlined,
   CheckOutlined,
   DiffOutlined,
   EditOutlined,
@@ -30,7 +32,7 @@ import {
   ShoppingCartOutlined,
   StarFilled,
 } from "@ant-design/icons";
-import { generateQuote, getServiceCatalog, QuoteFormat } from "@/lib/api";
+import { createCostEstimate, generateQuote, getProjects, getServiceCatalog, QuoteFormat } from "@/lib/api";
 import { useApi } from "@/lib/useApi";
 import { ServicePackage } from "@/lib/types";
 import { getPackageTheme } from "@/lib/serviceCatalogTheme";
@@ -297,7 +299,9 @@ function CompareModal({
 }
 
 export default function ServiceCatalogPage() {
+  const router = useRouter();
   const { data: packages, loading, refetch } = useApi(getServiceCatalog);
+  const { data: projects } = useApi(getProjects);
   const [newPackageOpen, setNewPackageOpen] = useState(false);
   const [cart, setCart] = useState<string[]>([]);
   const [compareIds, setCompareIds] = useState<string[]>([]);
@@ -307,6 +311,7 @@ export default function ServiceCatalogPage() {
   const [description, setDescription] = useState("");
   const [format, setFormat] = useState<QuoteFormat>("docx");
   const [generating, setGenerating] = useState(false);
+  const [savingCostEstimate, setSavingCostEstimate] = useState(false);
   const [projectId, setProjectId] = useState<string | null>(null);
   const [projectName, setProjectName] = useState<string | null>(null);
   const [messageApi, contextHolder] = message.useMessage();
@@ -347,6 +352,13 @@ export default function ServiceCatalogPage() {
     setCompareIds((prev) => (add ? [...prev, id] : prev.filter((x) => x !== id)));
   };
 
+  const handleSelectProject = (id: string | null) => {
+    setProjectId(id);
+    const project = id ? (projects ?? []).find((p) => p.id === id) : null;
+    setProjectName(project?.name ?? null);
+    if (project && !customerName.trim()) setCustomerName(project.customer);
+  };
+
   const canGenerate = cart.length > 0 && customerName.trim().length > 0 && description.trim().length > 0;
 
   const handleGenerateQuote = async () => {
@@ -366,6 +378,20 @@ export default function ServiceCatalogPage() {
       messageApi.error(err instanceof Error ? err.message : "Failed to generate quote.");
     } finally {
       setGenerating(false);
+    }
+  };
+
+  const handleSaveCostEstimate = async () => {
+    if (!projectId || cart.length === 0) return;
+    setSavingCostEstimate(true);
+    try {
+      const doc = await createCostEstimate(projectId, cart);
+      messageApi.success("Cost estimate saved to the project.");
+      router.push(`/documents/${doc.id}`);
+    } catch (err) {
+      messageApi.error(err instanceof Error ? err.message : "Failed to save cost estimate.");
+    } finally {
+      setSavingCostEstimate(false);
     }
   };
 
@@ -485,6 +511,21 @@ export default function ServiceCatalogPage() {
           </div>
 
           <div className="flex items-end gap-3">
+            <div style={{ width: 200 }}>
+              <Text type="secondary" className="text-xs">
+                Link to Project (optional)
+              </Text>
+              <Select
+                allowClear
+                placeholder="None"
+                value={projectId ?? undefined}
+                onChange={(v) => handleSelectProject(v ?? null)}
+                style={{ width: "100%" }}
+                options={(projects ?? []).map((p) => ({ value: p.id, label: p.name }))}
+                showSearch
+                optionFilterProp="label"
+              />
+            </div>
             <div style={{ width: 220 }}>
               <Text type="secondary" className="text-xs">
                 Customer Name <Text type="danger">*</Text>
@@ -527,6 +568,15 @@ export default function ServiceCatalogPage() {
               onClick={handleGenerateQuote}
             >
               Generate Quote
+            </Button>
+            <Button
+              icon={<CalculatorOutlined />}
+              loading={savingCostEstimate}
+              disabled={cart.length === 0 || !projectId}
+              onClick={handleSaveCostEstimate}
+              title={!projectId ? "Link to a project first to save a cost estimate" : undefined}
+            >
+              Save as Cost Estimate Document
             </Button>
           </div>
         </div>
