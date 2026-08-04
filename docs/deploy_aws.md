@@ -77,7 +77,7 @@ npm run build
 ### 3. Database — pick one
 
 **Option A: SQLite (cheapest, simplest, recommended to start)**
-Nothing to install — it's already what the app uses in dev. Just make sure `backend/.env` has `DATABASE_URL=sqlite:///./sagenerator.db` and that `backend/sagenerator.db` lives on the EBS volume (it does, by default). Back it up by copying that one file somewhere (S3, even just `scp` to your laptop periodically) — there's no automated backup story here, so do this manually on a schedule.
+Nothing to install — it's already what the app uses in dev. Just make sure `backend/.env` has `DATABASE_URL=sqlite:///./sagenerator.db` and that `backend/sagenerator.db` lives on the EBS volume (it does, by default). See **Backups** below — there's no automated backup story here, so do this manually on a schedule.
 
 **Option B: Postgres, installed natively — still no RDS bill, no Docker either.** This is what `docs/main.tf` sets up automatically via `user_data` if you're using that Terraform file; the commands below are the same thing done by hand:
 ```bash
@@ -94,7 +94,36 @@ sudo systemctl restart postgresql-16
 sudo -u postgres psql -c "CREATE USER sagen WITH PASSWORD '<choose-a-real-password>';"
 sudo -u postgres createdb -O sagen sagenerator
 ```
-Then set `DATABASE_URL=postgresql://sagen:<that-password>@localhost:5432/sagenerator` in `backend/.env`. This gets you Postgres's better concurrency/tooling without an RDS line item *or* a Docker layer — the tradeoff is you're responsible for backing it up yourself (`sudo -u postgres pg_dump sagenerator > backup.sql` on a cron job), since there's no RDS automated snapshot behind it.
+Then set `DATABASE_URL=postgresql://sagen:<that-password>@localhost:5432/sagenerator` in `backend/.env`. This gets you Postgres's better concurrency/tooling without an RDS line item *or* a Docker layer — the tradeoff is you're responsible for backing it up yourself. See **Backups** below, since there's no RDS automated snapshot behind it.
+
+### Backups
+
+There's no automated backup of anything in this shape — no RDS snapshots, no EBS
+snapshot schedule set up by default. Two things need backing up, and it's easy to only
+remember the first one:
+
+1. **The database** — SQLite: copy `backend/sagenerator.db`. Postgres:
+   `sudo -u postgres pg_dump sagenerator > backup.sql`.
+2. **`backend/uploads/`** — easy to forget since it's not "the database," but it holds
+   real user-generated content that isn't reconstructable from anything else: exported
+   architecture diagram PNGs (`uploads/diagrams/`), Knowledge Base files
+   (`uploads/knowledge-base/`), and project source-document uploads. It lives on the
+   same EBS volume as the database, so losing the volume loses both — back them up
+   together.
+
+A simple cron job covering both (SQLite variant):
+```bash
+# /etc/cron.daily/sagen-backup (chmod +x)
+#!/bin/bash
+STAMP=$(date +%F)
+tar czf "/tmp/sagen-backup-$STAMP.tar.gz" \
+  /home/ec2-user/sa-generator/backend/sagenerator.db \
+  /home/ec2-user/sa-generator/backend/uploads/
+aws s3 cp "/tmp/sagen-backup-$STAMP.tar.gz" "s3://your-backup-bucket/sagen/"
+rm "/tmp/sagen-backup-$STAMP.tar.gz"
+```
+Swap the `tar`'s first path for a `pg_dump` output file if you're on Postgres. Either
+way: this is a manual step you have to actually set up — it does not happen by default.
 
 ### 4. Environment variables for production
 
@@ -198,7 +227,9 @@ Signs you've genuinely outgrown the single-instance shape: real concurrent load 
 - [ ] `JWT_SECRET` is a fresh value, not copied from a dev `.env`
 - [ ] AI provider set to LiteLLM in Settings, with a working API key
 - [ ] Default admin password rotated
-- [ ] A manual or cron-scheduled backup of the SQLite file (or `pg_dump` if using Option B) actually exists somewhere off the instance
+- [ ] A manual or cron-scheduled backup of the database (SQLite file or Postgres
+      `pg_dump`) **and** `backend/uploads/` actually exists somewhere off the instance —
+      see **Backups** above
 - [ ] Security group confirmed: only 80/443 open publicly, 22 restricted to your IP
 
 ## Known gaps to be aware of

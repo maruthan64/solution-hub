@@ -7,6 +7,14 @@ through commit history.
 
 ## Unreleased
 
+## 2026-08-04 — Backup docs now cover uploads/, not just the database
+
+`docs/deploy_aws.md`'s backup guidance only ever mentioned backing up the database
+(SQLite file or `pg_dump`) — `backend/uploads/` (exported diagram PNGs, Knowledge Base
+files, project source-document uploads) lived on the same EBS volume but was never
+actually named as something to back up. Added a dedicated **Backups** section covering
+both together, with a sample cron job, and updated the pre-deploy checklist to match.
+
 ## 2026-08-04 — Rename to CloudSolution Hub; testing guide
 
 - Renamed the app from SA Generator to **CloudSolution Hub** — display branding only
