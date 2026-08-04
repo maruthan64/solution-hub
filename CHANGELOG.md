@@ -7,6 +7,18 @@ through commit history.
 
 ## Unreleased
 
+## 2026-08-04 — Rename to CloudSolution Hub; testing guide
+
+- Renamed the app from SA Generator to **CloudSolution Hub** — display branding only
+  (README/CHANGELOG titles, `package.json` name, in-app UI text, FastAPI/OpenAPI title,
+  the AI chat system prompt's self-description). The GitHub repo, local folder, and
+  deployment-doc directory/service names were left as-is intentionally — those are
+  infrastructure identifiers, not display branding.
+- New `docs/testing.md` — the actual testing guide the README's 3-line blurb pointed at
+  but didn't have: what each backend/frontend test file covers, how the pytest
+  fixtures and DB isolation work, the "patch where it's used, not where it's defined"
+  mocking gotcha this codebase already hit once, and how to add new tests.
+
 ## 2026-08-03 — Tests/CI, diagram insert-at-heading, Cost Estimator, Chat → Project
 
 Closed all five gaps that were sitting in README's "Not yet real" section.

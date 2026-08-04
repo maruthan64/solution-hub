@@ -214,7 +214,9 @@ and Claude CLI options).
 
 **Tests** — `cd backend && pytest` (spins up its own throwaway SQLite DB, no setup
 needed) and `npm test` (Vitest) from the repo root. Both run in CI on every push/PR to
-`main` (`.github/workflows/ci.yml`), alongside `npm run lint` and `npm run build`.
+`main` (`.github/workflows/ci.yml`), alongside `npm run lint` and `npm run build`. See
+[`docs/testing.md`](docs/testing.md) for what's covered, how the fixtures/mocking work,
+and how to add new tests.
 
 **Before production:** rotate the admin password, switch to Postgres, and put this
 behind HTTPS (`JWT_SECRET` is already a random secret and `/api/auth/login` already
