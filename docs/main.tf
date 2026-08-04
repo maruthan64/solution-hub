@@ -1,4 +1,4 @@
-# SA Generator on AWS — single EC2 instance behind an ALB that terminates
+# CloudSolution Hub on AWS — single EC2 instance behind an ALB that terminates
 # HTTPS. TLS lives ONLY at the load balancer: the instance itself serves
 # plain HTTP on port 3000 (Next.js), never exposed directly to the internet.
 # PostgreSQL runs natively on the same instance (no Docker, no RDS) — see

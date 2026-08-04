@@ -1,6 +1,6 @@
 # Changelog
 
-A running log of features and notable changes to SA Generator, newest first.
+A running log of features and notable changes to CloudSolution Hub, newest first.
 Update this file whenever a feature is added, changed, or removed — it's the
 one place to check "what exists and when did it show up" without digging
 through commit history.

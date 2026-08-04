@@ -1,4 +1,4 @@
-# SA Generator
+# CloudSolution Hub
 
 An internal tool for a cloud service provider/reseller: solution architects generate
 customer-facing documents (Solution Design Documents, ADRs, BOMs, quotes), manage a

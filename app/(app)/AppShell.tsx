@@ -29,7 +29,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       <Sider collapsible collapsed={collapsed} onCollapse={setCollapsed} theme="light" width={232}>
         <div className="h-16 flex items-center justify-center border-b border-gray-200">
           <span className="text-xl font-semibold whitespace-nowrap overflow-hidden">
-            {collapsed ? "📐" : "📐 SA Generator"}
+            {collapsed ? "📐" : "📐 CloudSolution Hub"}
           </span>
         </div>
         <Menu

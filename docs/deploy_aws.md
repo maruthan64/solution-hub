@@ -1,4 +1,4 @@
-# Deploying SA Generator on AWS — minimal cost
+# Deploying CloudSolution Hub on AWS — minimal cost
 
 This app is two processes talking over HTTP:
 

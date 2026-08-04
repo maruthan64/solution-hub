@@ -33,7 +33,7 @@ function LoginPageContent() {
       <Card className="w-full max-w-lg shadow-md">
         <Space direction="vertical" size="middle" className="w-full">
           <div className="text-center">
-            <Title level={2}>📐 SA Generator</Title>
+            <Title level={2}>📐 CloudSolution Hub</Title>
           </div>
 
           <div className="text-center">

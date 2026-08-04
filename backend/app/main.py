@@ -25,7 +25,7 @@ from app.routers import (
 
 Base.metadata.create_all(bind=engine)
 
-app = FastAPI(title="SA Generator API")
+app = FastAPI(title="CloudSolution Hub API")
 
 cors_origins = [o.strip() for o in os.getenv("CORS_ORIGIN", "http://localhost:3000").split(",") if o.strip()]
 app.add_middleware(
