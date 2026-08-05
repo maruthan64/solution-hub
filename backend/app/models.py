@@ -152,7 +152,12 @@ class Capability(Base):
 
     __tablename__ = "capabilities"
 
-    id: Mapped[str] = mapped_column(String(32), primary_key=True)
+    # Wider than the usual String(32) id columns — capabilities.py's own create endpoint
+    # generates short uuid-hex ids that would fit in 32, but seed.py's human-readable
+    # slugs (e.g. "cap-kubernetes-container-platforms") run over 32 chars. SQLite never
+    # enforces VARCHAR length at all, so this only surfaced once seeding against real
+    # Postgres, which does.
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
     name: Mapped[str] = mapped_column(String(200))
     cloud: Mapped[str] = mapped_column(String(32))
     description: Mapped[str] = mapped_column(Text, default="")
