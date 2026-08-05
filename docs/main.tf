@@ -1,12 +1,11 @@
-# CloudSolution Hub on AWS — single EC2 instance behind an ALB that terminates
-# HTTPS. TLS lives ONLY at the load balancer: the instance itself serves
-# plain HTTP on port 3000 (Next.js), never exposed directly to the internet.
-# PostgreSQL runs natively on the same instance (no Docker, no RDS) — see
-# docs/deploy_aws.md for that reasoning and the "when you outgrow this"
-# upgrade path. Adding the ALB back in here does bring back its ~$16-20/mo
-# baseline cost versus the nginx+certbot-on-the-instance variant in that doc
-# — a deliberate tradeoff for managed certificate rotation and the standard
-# AWS TLS-termination pattern.
+# CloudSolution Hub on AWS — single EC2 instance in its own dedicated VPC, no
+# load balancer. TLS terminates on the instance itself via nginx + a free
+# Let's Encrypt certificate (certbot) — this is the same "minimal-cost shape"
+# docs/deploy_aws.md documents as manual copy-paste steps; this file just
+# automates the provisioning half of it (network, instance, DB init, nginx +
+# certbot package install). Route 53 is optional: leave domain_name /
+# route53_zone_name unset to get a plain http://<elastic-ip> instance for
+# testing, and wire up a real domain (+ run certbot) later.
 
 terraform {
   required_version = ">= 1.5"
@@ -29,7 +28,7 @@ provider "aws" {
 variable "aws_region" {
   description = "AWS region to deploy into."
   type        = string
-  default     = "us-east-1"
+  default     = "ap-south-1"
 }
 
 variable "project_name" {
@@ -60,11 +59,6 @@ variable "root_volume_gb" {
   default     = 20
 }
 
-variable "certificate_arn" {
-  description = "ARN of an ACM certificate for your domain, already issued and validated (ACM certs are free — validate it via Route 53 or email before running this)."
-  type        = string
-}
-
 variable "db_name" {
   description = "PostgreSQL database name (installed natively on the instance, not RDS)."
   type        = string
@@ -83,45 +77,120 @@ variable "db_password" {
   sensitive   = true
 }
 
+variable "vpc_cidr" {
+  description = "CIDR block for this app's dedicated VPC."
+  type        = string
+  default     = "10.0.0.0/16"
+}
+
+variable "public_subnet_cidr" {
+  description = "CIDR block for the single public subnet the instance lives in."
+  type        = string
+  default     = "10.0.1.0/24"
+}
+
+variable "domain_name" {
+  description = "Full hostname to point at this instance, e.g. \"app.yourdomain.com\". Leave empty to skip Route 53 entirely and just use the instance's Elastic IP (e.g. for testing before a domain is ready)."
+  type        = string
+  default     = ""
+}
+
+variable "route53_zone_name" {
+  description = "Name of an existing Route 53 hosted zone, e.g. \"yourdomain.com\" — the parent zone domain_name lives in. Required only if domain_name is set."
+  type        = string
+  default     = ""
+}
+
+locals {
+  create_dns = var.domain_name != "" && var.route53_zone_name != ""
+}
+
 # ---------------------------------------------------------------------------
-# AMI — latest Amazon Linux 2023, arm64 to match t4g instance types
+# AMI — latest Ubuntu 24.04 LTS (Noble), arm64 to match t4g instance types.
+# Published by Canonical (owner 099720109477, their well-known AWS account).
 # ---------------------------------------------------------------------------
 
-data "aws_ami" "amazon_linux" {
+data "aws_ami" "ubuntu" {
   most_recent = true
-  owners      = ["amazon"]
+  owners      = ["099720109477"]
 
   filter {
     name   = "name"
-    values = ["al2023-ami-*-arm64"]
+    values = ["ubuntu/images/hvm-ssd-gp3/ubuntu-noble-24.04-arm64-server-*"]
   }
 
   filter {
-    name   = "architecture"
-    values = ["arm64"]
+    name   = "virtualization-type"
+    values = ["hvm"]
   }
 }
 
-# ---------------------------------------------------------------------------
-# Networking — default VPC/subnets, two security groups (ALB public, app
-# reachable only from the ALB)
-# ---------------------------------------------------------------------------
-
-data "aws_vpc" "default" {
-  default = true
+data "aws_availability_zones" "available" {
+  state = "available"
 }
 
-data "aws_subnets" "default" {
-  filter {
-    name   = "vpc-id"
-    values = [data.aws_vpc.default.id]
+# ---------------------------------------------------------------------------
+# Networking — dedicated VPC (not the account's default one, which may hold
+# unrelated resources from other projects) with a single public subnet.
+# ---------------------------------------------------------------------------
+
+resource "aws_vpc" "main" {
+  cidr_block           = var.vpc_cidr
+  enable_dns_support   = true
+  enable_dns_hostnames = true
+
+  tags = {
+    Name = "${var.project_name}-vpc"
   }
 }
 
-resource "aws_security_group" "alb" {
-  name        = "${var.project_name}-alb-sg"
-  description = "Public HTTPS/HTTP entry point — the only thing exposed to the internet"
-  vpc_id      = data.aws_vpc.default.id
+resource "aws_internet_gateway" "main" {
+  vpc_id = aws_vpc.main.id
+
+  tags = {
+    Name = "${var.project_name}-igw"
+  }
+}
+
+resource "aws_subnet" "public" {
+  vpc_id                  = aws_vpc.main.id
+  cidr_block              = var.public_subnet_cidr
+  availability_zone       = data.aws_availability_zones.available.names[0]
+  map_public_ip_on_launch = true
+
+  tags = {
+    Name = "${var.project_name}-public-subnet"
+  }
+}
+
+resource "aws_route_table" "public" {
+  vpc_id = aws_vpc.main.id
+
+  route {
+    cidr_block = "0.0.0.0/0"
+    gateway_id = aws_internet_gateway.main.id
+  }
+
+  tags = {
+    Name = "${var.project_name}-public-rt"
+  }
+}
+
+resource "aws_route_table_association" "public" {
+  subnet_id      = aws_subnet.public.id
+  route_table_id = aws_route_table.public.id
+}
+
+# ---------------------------------------------------------------------------
+# Security group — nginx on the instance is the only thing exposed to the
+# internet (80/443); SSH is restricted to a single CIDR. No load balancer, so
+# no separate ALB security group.
+# ---------------------------------------------------------------------------
+
+resource "aws_security_group" "app" {
+  name        = "${var.project_name}-sg"
+  description = "nginx (80/443) exposed publicly, SSH restricted to a single CIDR"
+  vpc_id      = aws_vpc.main.id
 
   ingress {
     description = "HTTPS"
@@ -132,40 +201,15 @@ resource "aws_security_group" "alb" {
   }
 
   ingress {
-    description = "HTTP — redirected straight to HTTPS by the listener rule below"
+    description = "HTTP - nginx itself, and the certbot ACME HTTP-01 challenge"
     from_port   = 80
     to_port     = 80
     protocol    = "tcp"
     cidr_blocks = ["0.0.0.0/0"]
   }
 
-  egress {
-    from_port   = 0
-    to_port     = 0
-    protocol    = "-1"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
-  tags = {
-    Name = "${var.project_name}-alb-sg"
-  }
-}
-
-resource "aws_security_group" "app" {
-  name        = "${var.project_name}-sg"
-  description = "App instance: port 3000 reachable only from the ALB, SSH restricted to a single CIDR"
-  vpc_id      = data.aws_vpc.default.id
-
   ingress {
-    description     = "Next.js — only from the ALB, never directly from the internet"
-    from_port       = 3000
-    to_port         = 3000
-    protocol        = "tcp"
-    security_groups = [aws_security_group.alb.id]
-  }
-
-  ingress {
-    description = "SSH — restricted to a single CIDR, never open to the internet"
+    description = "SSH - restricted to a single CIDR, never open to the internet"
     from_port   = 22
     to_port     = 22
     protocol    = "tcp"
@@ -185,19 +229,24 @@ resource "aws_security_group" "app" {
 }
 
 # ---------------------------------------------------------------------------
-# EC2 instance — installs app runtime deps (Python, Node) and PostgreSQL
-# natively on the same instance (no Docker, no RDS), initializes it, and
-# creates the app database/user. Cloning the repo, building the app, and
-# setting up the systemd units for the frontend/backend is still the manual
-# step-by-step in docs/deploy_aws.md, since that needs your actual repo URL,
-# which this file can't know. TLS is handled entirely by the ALB, not here.
+# EC2 instance — installs app runtime deps (Python, Node), PostgreSQL natively
+# (no Docker, no RDS), nginx, and certbot; initializes Postgres and creates the
+# app database/user; writes the nginx reverse-proxy config from
+# docs/deploy_aws.md §6 (server_name is the real domain if one was given,
+# otherwise nginx's "_" catch-all so plain-IP access still works).
+#
+# NOT automated here, on purpose: cloning the repo, building the app, the
+# systemd units for the frontend/backend, and actually running
+# `certbot --nginx -d <domain>` (needs DNS to have already propagated to the
+# Elastic IP this same apply creates — racing that from user_data would fail
+# unpredictably). Those stay the manual step-by-step in docs/deploy_aws.md.
 # ---------------------------------------------------------------------------
 
 resource "aws_instance" "app" {
-  ami                    = data.aws_ami.amazon_linux.id
+  ami                    = data.aws_ami.ubuntu.id
   instance_type          = var.instance_type
   key_name               = var.key_name
-  subnet_id              = data.aws_subnets.default.ids[0]
+  subnet_id              = aws_subnet.public.id
   vpc_security_group_ids = [aws_security_group.app.id]
 
   root_block_device {
@@ -208,18 +257,43 @@ resource "aws_instance" "app" {
   user_data = <<-EOF
     #!/bin/bash
     set -e
-    dnf install -y python3.12 nodejs git postgresql16-server postgresql16
+    export DEBIAN_FRONTEND=noninteractive
+    apt-get update -y
+    apt-get install -y python3.12 python3.12-venv python3-pip nodejs npm git postgresql nginx certbot python3-certbot-nginx
 
-    postgresql-16-setup --initdb
-    systemctl enable --now postgresql-16
-
-    # Password auth over TCP (127.0.0.1 only) instead of the default "ident" —
-    # the app connects via a postgresql:// URL, not the postgres OS user.
-    sed -i -E 's/^(host[[:space:]]+all[[:space:]]+all[[:space:]]+127\.0\.0\.1\/32[[:space:]]+)ident$/\1scram-sha-256/' /var/lib/pgsql/data/pg_hba.conf
-    systemctl restart postgresql-16
+    # Ubuntu's postgresql package auto-initializes and starts a cluster on install
+    # (unlike Amazon Linux's postgresqlNN-server, which needs an explicit initdb step).
+    # Force TCP auth on 127.0.0.1 to scram-sha-256 regardless of whatever the
+    # packaged default is — the app connects via a postgresql:// URL, not peer auth.
+    # Path is 3 levels deep (/etc/postgresql/<version>/main/pg_hba.conf) — no maxdepth
+    # limit here, a previous version of this script hardcoded maxdepth 2 and silently
+    # matched nothing, which fed sed an empty filename and aborted the rest of the script.
+    PG_HBA=$(find /etc/postgresql -name pg_hba.conf | head -n1)
+    sed -i -E "s/^(host[[:space:]]+all[[:space:]]+all[[:space:]]+127\.0\.0\.1\/32[[:space:]]+)\S+$/\1scram-sha-256/" "$PG_HBA"
+    systemctl restart postgresql
 
     sudo -u postgres psql -c "CREATE USER ${var.db_user} WITH PASSWORD '${var.db_password}';"
     sudo -u postgres createdb -O ${var.db_user} ${var.db_name}
+
+    # Ubuntu's nginx package ships its own default site (also server_name "_") already
+    # enabled on port 80 — remove it, or it silently wins the default_server slot over
+    # ours and every request just serves nginx's stock welcome page instead of proxying.
+    rm -f /etc/nginx/sites-enabled/default
+
+    cat > /etc/nginx/conf.d/sagen.conf <<'NGINXCONF'
+    server {
+        listen 80 default_server;
+        server_name ${var.domain_name != "" ? var.domain_name : "_"};
+
+        location / {
+            proxy_pass http://127.0.0.1:3000;
+            proxy_set_header Host $host;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+        }
+    }
+    NGINXCONF
+    systemctl enable --now nginx
   EOF
 
   tags = {
@@ -227,8 +301,7 @@ resource "aws_instance" "app" {
   }
 }
 
-# Kept for stable SSH access even though the app itself is now reached via
-# the ALB, not this IP directly — free while attached to a running instance.
+# The actual public entry point for the app (nginx listens here), not just SSH.
 resource "aws_eip" "app" {
   instance = aws_instance.app.id
   domain   = "vpc"
@@ -239,85 +312,42 @@ resource "aws_eip" "app" {
 }
 
 # ---------------------------------------------------------------------------
-# Load balancer — this is where HTTPS terminates. The instance behind it
-# only ever sees plain HTTP on port 3000.
+# Route 53 — optional. Skipped entirely if domain_name or route53_zone_name
+# is left unset, e.g. for testing straight against the Elastic IP.
 # ---------------------------------------------------------------------------
 
-resource "aws_lb" "app" {
-  name               = "${var.project_name}-alb"
-  internal           = false
-  load_balancer_type = "application"
-  security_groups    = [aws_security_group.alb.id]
-  subnets            = data.aws_subnets.default.ids
+data "aws_route53_zone" "this" {
+  count = local.create_dns ? 1 : 0
+  name  = var.route53_zone_name
 }
 
-resource "aws_lb_target_group" "app" {
-  name     = "${var.project_name}-tg"
-  port     = 3000
-  protocol = "HTTP"
-  vpc_id   = data.aws_vpc.default.id
-
-  health_check {
-    path                = "/api/health"
-    healthy_threshold   = 2
-    unhealthy_threshold = 3
-    interval            = 30
-    timeout             = 5
-  }
-}
-
-resource "aws_lb_target_group_attachment" "app" {
-  target_group_arn = aws_lb_target_group.app.arn
-  target_id        = aws_instance.app.id
-  port             = 3000
-}
-
-resource "aws_lb_listener" "https" {
-  load_balancer_arn = aws_lb.app.arn
-  port              = 443
-  protocol          = "HTTPS"
-  ssl_policy        = "ELBSecurityPolicy-TLS13-1-2-2021-06"
-  certificate_arn   = var.certificate_arn
-
-  default_action {
-    type             = "forward"
-    target_group_arn = aws_lb_target_group.app.arn
-  }
-}
-
-resource "aws_lb_listener" "http_redirect" {
-  load_balancer_arn = aws_lb.app.arn
-  port              = 80
-  protocol          = "HTTP"
-
-  default_action {
-    type = "redirect"
-    redirect {
-      port        = "443"
-      protocol    = "HTTPS"
-      status_code = "HTTP_301"
-    }
-  }
+resource "aws_route53_record" "app" {
+  count   = local.create_dns ? 1 : 0
+  zone_id = data.aws_route53_zone.this[0].zone_id
+  name    = var.domain_name
+  type    = "A"
+  ttl     = 300
+  records = [aws_eip.app.public_ip]
 }
 
 # ---------------------------------------------------------------------------
 # Outputs
 # ---------------------------------------------------------------------------
 
-output "alb_dns_name" {
-  description = "Point your Route 53 record (as an ALIAS, not a plain CNAME) at this."
-  value       = aws_lb.app.dns_name
-}
-
-output "instance_ssh_ip" {
-  description = "For SSH only — the app itself is reached through the ALB, not this IP."
-  value       = aws_eip.app.public_ip
-}
-
 output "instance_id" {
   value = aws_instance.app.id
 }
 
+output "instance_ip" {
+  description = "The app's public entry point (nginx listens here on 80/443) and SSH target."
+  value       = aws_eip.app.public_ip
+}
+
+output "app_url" {
+  description = "Where to reach the app once nginx (and, if a domain is set, certbot) is up."
+  value       = var.domain_name != "" ? "https://${var.domain_name}" : "http://${aws_eip.app.public_ip}"
+}
+
 output "ssh_command" {
-  value = "ssh -i <your-key.pem> ec2-user@${aws_eip.app.public_ip}"
+  value = "ssh -i <your-key.pem> ubuntu@${aws_eip.app.public_ip}"
 }

@@ -13,3 +13,13 @@ backend/uploads/
 
 *.log
 tsconfig.tsbuildinfo
+
+# Terraform local state/plugins — the state file stores real values for every resource
+# attribute, including ones from variables marked sensitive (e.g. db_password), so it
+# must never be committed. .terraform.lock.hcl is the one exception: that's just
+# provider version pinning, not sensitive, and should stay tracked.
+docs/.terraform/
+docs/terraform.tfstate
+docs/terraform.tfstate.backup
+docs/*.tfplan
+docs/*.tfvars

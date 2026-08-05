@@ -117,8 +117,8 @@ A simple cron job covering both (SQLite variant):
 #!/bin/bash
 STAMP=$(date +%F)
 tar czf "/tmp/sagen-backup-$STAMP.tar.gz" \
-  /home/ec2-user/sa-generator/backend/sagenerator.db \
-  /home/ec2-user/sa-generator/backend/uploads/
+  /home/ubuntu/sa-generator/backend/sagenerator.db \
+  /home/ubuntu/sa-generator/backend/uploads/
 aws s3 cp "/tmp/sagen-backup-$STAMP.tar.gz" "s3://your-backup-bucket/sagen/"
 rm "/tmp/sagen-backup-$STAMP.tar.gz"
 ```
@@ -147,10 +147,10 @@ Description=SA Generator backend
 After=network.target
 
 [Service]
-WorkingDirectory=/home/ec2-user/sa-generator/backend
-ExecStart=/home/ec2-user/sa-generator/backend/venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8000
+WorkingDirectory=/home/ubuntu/sa-generator/backend
+ExecStart=/home/ubuntu/sa-generator/backend/venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8000
 Restart=on-failure
-EnvironmentFile=/home/ec2-user/sa-generator/backend/.env
+EnvironmentFile=/home/ubuntu/sa-generator/backend/.env
 
 [Install]
 WantedBy=multi-user.target
@@ -163,7 +163,7 @@ Description=SA Generator frontend
 After=network.target sagen-backend.service
 
 [Service]
-WorkingDirectory=/home/ec2-user/sa-generator/frontend
+WorkingDirectory=/home/ubuntu/sa-generator/frontend
 ExecStart=/usr/bin/npm start
 Restart=on-failure
 Environment=BACKEND_URL=http://127.0.0.1:8000
