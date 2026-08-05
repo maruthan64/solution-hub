@@ -233,75 +233,78 @@ export default function SettingsPage() {
         </Form>
       </Card>
 
-      <Card title="AWS Bedrock Credentials">
-        <Text type="secondary" className="text-sm">
-          Only used when AI Assistant above is set to AWS Bedrock. Leave Access Key ID and
-          Secret Access Key blank to keep them unchanged (or to fall back to the backend&apos;s
-          own environment / IAM role instead of a stored key).
-        </Text>
-        <Divider style={{ margin: "12px 0" }} />
-        {loading || !settings ? (
-          <Spin />
-        ) : (
-          <>
-            {(settings.bedrockAccessKeyIdPreview || settings.bedrockSecretKeySet) && (
-              <Space direction="vertical" size={0} className="mb-2">
-                {settings.bedrockAccessKeyIdPreview && (
+      {aiProvider === "bedrock" && (
+        <Card title="AWS Bedrock Credentials">
+          <Text type="secondary" className="text-sm">
+            AWS requires both an Access Key ID and a Secret Access Key together — they
+            cryptographically sign each request (AWS Signature V4), unlike a single bearer-token
+            API key. Leave either blank to keep it unchanged (or to fall back to the backend&apos;s
+            own environment / IAM role instead of a stored key).
+          </Text>
+          <Divider style={{ margin: "12px 0" }} />
+          {loading || !settings ? (
+            <Spin />
+          ) : (
+            <>
+              {(settings.bedrockAccessKeyIdPreview || settings.bedrockSecretKeySet) && (
+                <Space direction="vertical" size={0} className="mb-2">
+                  {settings.bedrockAccessKeyIdPreview && (
+                    <Text type="secondary" className="text-sm">
+                      Current Access Key ID: <Text code>{settings.bedrockAccessKeyIdPreview}</Text>
+                    </Text>
+                  )}
                   <Text type="secondary" className="text-sm">
-                    Current Access Key ID: <Text code>{settings.bedrockAccessKeyIdPreview}</Text>
+                    Secret Access Key: {settings.bedrockSecretKeySet ? "set" : "not set"}
                   </Text>
-                )}
-                <Text type="secondary" className="text-sm">
-                  Secret Access Key: {settings.bedrockSecretKeySet ? "set" : "not set"}
-                </Text>
-              </Space>
-            )}
-            <Form layout="vertical" requiredMark={false}>
-              <Form.Item label="Access Key ID">
-                <Input.Password
-                  placeholder="AKIA..."
-                  size="large"
-                  value={bedrockAccessKeyId}
-                  onChange={(e) => setBedrockAccessKeyId(e.target.value)}
-                />
-              </Form.Item>
-              <Form.Item label="Secret Access Key">
-                <Input.Password
-                  placeholder="Leave blank to keep the current one"
-                  size="large"
-                  value={bedrockSecretAccessKey}
-                  onChange={(e) => setBedrockSecretAccessKey(e.target.value)}
-                />
-              </Form.Item>
-              <Form.Item label="Region">
-                <Select
-                  size="large"
-                  placeholder="Select a region"
-                  value={bedrockRegion || undefined}
-                  onChange={setBedrockRegion}
-                  options={BEDROCK_REGION_OPTIONS}
-                  allowClear
-                  showSearch
-                />
-              </Form.Item>
-              <Form.Item
-                label="Model"
-                help='e.g. "bedrock/anthropic.claude-3-5-sonnet-20241022-v2:0" — see the AWS Bedrock console for available model IDs in your region.'
-              >
-                <Input
-                  placeholder="bedrock/anthropic.claude-3-5-sonnet-..."
-                  size="large"
-                  value={bedrockModel}
-                  onChange={(e) => setBedrockModel(e.target.value)}
-                />
-              </Form.Item>
-              <Button type="primary" loading={savingBedrock} onClick={handleSaveBedrock}>
-                Save Bedrock Credentials
-              </Button>
-            </Form>
-          </>
-        )}
-      </Card>
+                </Space>
+              )}
+              <Form layout="vertical" requiredMark={false}>
+                <Form.Item label="Access Key ID">
+                  <Input.Password
+                    placeholder="AKIA..."
+                    size="large"
+                    value={bedrockAccessKeyId}
+                    onChange={(e) => setBedrockAccessKeyId(e.target.value)}
+                  />
+                </Form.Item>
+                <Form.Item label="Secret Access Key">
+                  <Input.Password
+                    placeholder="Leave blank to keep the current one"
+                    size="large"
+                    value={bedrockSecretAccessKey}
+                    onChange={(e) => setBedrockSecretAccessKey(e.target.value)}
+                  />
+                </Form.Item>
+                <Form.Item label="Region">
+                  <Select
+                    size="large"
+                    placeholder="Select a region"
+                    value={bedrockRegion || undefined}
+                    onChange={setBedrockRegion}
+                    options={BEDROCK_REGION_OPTIONS}
+                    allowClear
+                    showSearch
+                  />
+                </Form.Item>
+                <Form.Item
+                  label="Model"
+                  help='e.g. "bedrock/anthropic.claude-3-5-sonnet-20241022-v2:0" — see the AWS Bedrock console for available model IDs in your region.'
+                >
+                  <Input
+                    placeholder="bedrock/anthropic.claude-3-5-sonnet-..."
+                    size="large"
+                    value={bedrockModel}
+                    onChange={(e) => setBedrockModel(e.target.value)}
+                  />
+                </Form.Item>
+                <Button type="primary" loading={savingBedrock} onClick={handleSaveBedrock}>
+                  Save Bedrock Credentials
+                </Button>
+              </Form>
+            </>
+          )}
+        </Card>
+      )}
     </div>
   );
 }
