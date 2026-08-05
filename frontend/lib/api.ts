@@ -185,6 +185,10 @@ export interface AppSettings {
   defaultCloud: string;
   defaultExportFormat: string;
   apiKeyPreview: string | null;
+  bedrockAccessKeyIdPreview: string | null;
+  bedrockSecretKeySet: boolean;
+  bedrockRegion: string | null;
+  bedrockModel: string | null;
 }
 
 export const getSettings = () => apiFetch<AppSettings>("/api/settings");
@@ -199,6 +203,16 @@ export const updateOrgSettings = (orgName: string, defaultCloud: string, default
 
 export const rotateApiKey = (apiKey: string) =>
   apiFetch<AppSettings>("/api/settings/api-key", { method: "POST", body: JSON.stringify({ apiKey }) });
+
+export interface BedrockCredentialsInput {
+  accessKeyId?: string;
+  secretAccessKey?: string;
+  region?: string;
+  model?: string;
+}
+
+export const updateBedrockCredentials = (input: BedrockCredentialsInput) =>
+  apiFetch<AppSettings>("/api/settings/bedrock", { method: "POST", body: JSON.stringify(input) });
 
 export const getServiceCatalog = () => apiFetch<ServicePackage[]>("/api/service-catalog");
 export const getServicePackage = (id: string) => apiFetch<ServicePackage>(`/api/service-catalog/${id}`);

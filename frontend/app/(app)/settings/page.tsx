@@ -1,8 +1,15 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Alert, Button, Card, Divider, Form, Input, Select, Spin, Typography, message } from "antd";
-import { AiProvider, getSettings, rotateApiKey, updateOrgSettings, updateSettings } from "@/lib/api";
+import { Alert, Button, Card, Divider, Form, Input, Select, Space, Spin, Typography, message } from "antd";
+import {
+  AiProvider,
+  getSettings,
+  rotateApiKey,
+  updateBedrockCredentials,
+  updateOrgSettings,
+  updateSettings,
+} from "@/lib/api";
 import { useApi } from "@/lib/useApi";
 
 const { Title, Text } = Typography;
@@ -21,9 +28,19 @@ const AI_PROVIDER_OPTIONS: { value: AiProvider; label: string; hint: string }[] 
   {
     value: "bedrock",
     label: "AWS Bedrock",
-    hint: 'Calls litellm.completion() with a bedrock/ model (BEDROCK_MODEL in backend/.env, e.g. "bedrock/anthropic.claude-3-5-sonnet-..."). Credentials come from the backend\'s environment — AWS access keys, or, recommended, an IAM role attached to the EC2 instance running it, so nothing needs to be stored here.',
+    hint: 'Calls litellm.completion() with a bedrock/ model. Enter credentials directly below, or leave them blank to fall back to the backend\'s own environment — an IAM role attached to the EC2 instance is the more secure option if you\'re running there.',
   },
 ];
+
+const BEDROCK_REGION_OPTIONS = [
+  "us-east-1",
+  "us-west-2",
+  "ap-south-1",
+  "ap-southeast-1",
+  "ap-southeast-2",
+  "eu-west-1",
+  "eu-central-1",
+].map((r) => ({ value: r, label: r }));
 
 export default function SettingsPage() {
   const { data: settings, loading, refetch } = useApi(getSettings);
@@ -36,6 +53,12 @@ export default function SettingsPage() {
   const [apiKey, setApiKey] = useState("");
   const [rotating, setRotating] = useState(false);
 
+  const [bedrockAccessKeyId, setBedrockAccessKeyId] = useState("");
+  const [bedrockSecretAccessKey, setBedrockSecretAccessKey] = useState("");
+  const [bedrockRegion, setBedrockRegion] = useState("");
+  const [bedrockModel, setBedrockModel] = useState("");
+  const [savingBedrock, setSavingBedrock] = useState(false);
+
   const [messageApi, contextHolder] = message.useMessage();
 
   useEffect(() => {
@@ -46,6 +69,8 @@ export default function SettingsPage() {
         defaultCloud: settings.defaultCloud,
         defaultExportFormat: settings.defaultExportFormat,
       });
+      setBedrockRegion(settings.bedrockRegion ?? "");
+      setBedrockModel(settings.bedrockModel ?? "");
     }
   }, [settings, orgForm]);
 
@@ -88,6 +113,26 @@ export default function SettingsPage() {
       messageApi.error(err instanceof Error ? err.message : "Failed to rotate key.");
     } finally {
       setRotating(false);
+    }
+  };
+
+  const handleSaveBedrock = async () => {
+    setSavingBedrock(true);
+    try {
+      await updateBedrockCredentials({
+        accessKeyId: bedrockAccessKeyId.trim() || undefined,
+        secretAccessKey: bedrockSecretAccessKey.trim() || undefined,
+        region: bedrockRegion.trim(),
+        model: bedrockModel.trim(),
+      });
+      setBedrockAccessKeyId("");
+      setBedrockSecretAccessKey("");
+      messageApi.success("AWS Bedrock credentials saved.");
+      refetch();
+    } catch (err) {
+      messageApi.error(err instanceof Error ? err.message : "Failed to save Bedrock credentials.");
+    } finally {
+      setSavingBedrock(false);
     }
   };
 
@@ -165,8 +210,7 @@ export default function SettingsPage() {
       <Card title="API Keys">
         <Text type="secondary" className="text-sm">
           Used by the FastAPI backend to authenticate outbound calls through LiteLLM. Not used
-          by AWS Bedrock, which authenticates via the backend&apos;s AWS credentials/IAM role
-          instead — leave this blank if you&apos;re using Bedrock.
+          by AWS Bedrock — see the card below for that.
         </Text>
         <Divider style={{ margin: "12px 0" }} />
         {settings?.apiKeyPreview && (
@@ -187,6 +231,76 @@ export default function SettingsPage() {
             Rotate Key
           </Button>
         </Form>
+      </Card>
+
+      <Card title="AWS Bedrock Credentials">
+        <Text type="secondary" className="text-sm">
+          Only used when AI Assistant above is set to AWS Bedrock. Leave Access Key ID and
+          Secret Access Key blank to keep them unchanged (or to fall back to the backend&apos;s
+          own environment / IAM role instead of a stored key).
+        </Text>
+        <Divider style={{ margin: "12px 0" }} />
+        {loading || !settings ? (
+          <Spin />
+        ) : (
+          <>
+            {(settings.bedrockAccessKeyIdPreview || settings.bedrockSecretKeySet) && (
+              <Space direction="vertical" size={0} className="mb-2">
+                {settings.bedrockAccessKeyIdPreview && (
+                  <Text type="secondary" className="text-sm">
+                    Current Access Key ID: <Text code>{settings.bedrockAccessKeyIdPreview}</Text>
+                  </Text>
+                )}
+                <Text type="secondary" className="text-sm">
+                  Secret Access Key: {settings.bedrockSecretKeySet ? "set" : "not set"}
+                </Text>
+              </Space>
+            )}
+            <Form layout="vertical" requiredMark={false}>
+              <Form.Item label="Access Key ID">
+                <Input.Password
+                  placeholder="AKIA..."
+                  size="large"
+                  value={bedrockAccessKeyId}
+                  onChange={(e) => setBedrockAccessKeyId(e.target.value)}
+                />
+              </Form.Item>
+              <Form.Item label="Secret Access Key">
+                <Input.Password
+                  placeholder="Leave blank to keep the current one"
+                  size="large"
+                  value={bedrockSecretAccessKey}
+                  onChange={(e) => setBedrockSecretAccessKey(e.target.value)}
+                />
+              </Form.Item>
+              <Form.Item label="Region">
+                <Select
+                  size="large"
+                  placeholder="Select a region"
+                  value={bedrockRegion || undefined}
+                  onChange={setBedrockRegion}
+                  options={BEDROCK_REGION_OPTIONS}
+                  allowClear
+                  showSearch
+                />
+              </Form.Item>
+              <Form.Item
+                label="Model"
+                help='e.g. "bedrock/anthropic.claude-3-5-sonnet-20241022-v2:0" — see the AWS Bedrock console for available model IDs in your region.'
+              >
+                <Input
+                  placeholder="bedrock/anthropic.claude-3-5-sonnet-..."
+                  size="large"
+                  value={bedrockModel}
+                  onChange={(e) => setBedrockModel(e.target.value)}
+                />
+              </Form.Item>
+              <Button type="primary" loading={savingBedrock} onClick={handleSaveBedrock}>
+                Save Bedrock Credentials
+              </Button>
+            </Form>
+          </>
+        )}
       </Card>
     </div>
   );

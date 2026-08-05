@@ -118,6 +118,10 @@ class SettingsOut(BaseModel):
     defaultCloud: str
     defaultExportFormat: str
     apiKeyPreview: str | None = None
+    bedrockAccessKeyIdPreview: str | None = None
+    bedrockSecretKeySet: bool = False
+    bedrockRegion: str | None = None
+    bedrockModel: str | None = None
 
 
 class SettingsUpdate(BaseModel):
@@ -132,6 +136,13 @@ class OrgSettingsUpdate(BaseModel):
 
 class ApiKeyUpdate(BaseModel):
     apiKey: str = Field(min_length=1)
+
+
+class BedrockCredentialsUpdate(BaseModel):
+    accessKeyId: str | None = None
+    secretAccessKey: str | None = None
+    region: str | None = None
+    model: str | None = None
 
 
 class ResourceLine(BaseModel):

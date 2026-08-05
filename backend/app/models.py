@@ -110,6 +110,12 @@ class AppSettings(Base):
     default_cloud: Mapped[str] = mapped_column(String(32), default="AWS")
     default_export_format: Mapped[str] = mapped_column(String(16), default="DOCX")
     litellm_proxy_key: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    # AWS Bedrock — entered directly in Settings rather than requiring backend/.env access;
+    # bridged into process env vars on save/startup since that's what litellm/boto3 read.
+    bedrock_access_key_id: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    bedrock_secret_access_key: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    bedrock_region: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    bedrock_model: Mapped[str | None] = mapped_column(String(200), nullable=True)
 
 
 class ServicePackage(Base):
