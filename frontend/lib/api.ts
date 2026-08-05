@@ -177,7 +177,7 @@ export const assistTemplate = (id: string, instruction: string) =>
     body: JSON.stringify({ instruction }),
   });
 
-export type AiProvider = "litellm" | "claude_cli";
+export type AiProvider = "litellm" | "claude_cli" | "bedrock";
 
 export interface AppSettings {
   aiProvider: AiProvider;

@@ -12,7 +12,8 @@ cd backend
 source venv/Scripts/activate   # Windows Git Bash
 pytest -v
 
-# Frontend — from the repo root
+# Frontend — from frontend/
+cd frontend
 npm test
 ```
 

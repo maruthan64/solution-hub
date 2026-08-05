@@ -7,6 +7,23 @@ through commit history.
 
 ## Unreleased
 
+## 2026-08-05 — AWS Bedrock as an AI provider; frontend moved into frontend/
+
+- **AWS Bedrock**: Settings now has a third AI provider option alongside LiteLLM and
+  Claude CLI. Implemented without duplicating any of the four AI capabilities
+  (drafting, chat, diagrams, chat→project extraction) — Bedrock is just another
+  `litellm.completion()` model string (`bedrock/...`, via `BEDROCK_MODEL` in
+  `backend/.env`) sharing the existing LiteLLM call path through a new
+  `_resolve_model(provider)` helper. No stored API key for it — auth comes from the
+  backend's AWS credentials or, recommended, an IAM role on the EC2 instance.
+- **Repo structure**: the frontend (`app/`, `components/`, `lib/`, and all its config)
+  moved from the repo root into its own `frontend/` folder, matching how `backend/`
+  already worked — each half is now unambiguous to identify and run independently.
+  Pure move, zero source changes: the `@/*` path alias resolves relative to wherever
+  `tsconfig.json` lives, so it kept working with no import edits anywhere. Updated:
+  `.github/workflows/ci.yml` (frontend job now has `working-directory: frontend`,
+  matching the backend job), `README.md`, `docs/deploy_aws.md`, `docs/testing.md`.
+
 ## 2026-08-04 — Backup docs now cover uploads/, not just the database
 
 `docs/deploy_aws.md`'s backup guidance only ever mentioned backing up the database

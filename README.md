@@ -204,6 +204,7 @@ python -m app.seed          # creates sagenerator.db and seeds demo data
 uvicorn app.main:app --reload --port 8000
 
 # Frontend (separate terminal)
+cd frontend
 npm install
 npm run dev                 # http://localhost:3000
 ```
@@ -213,7 +214,7 @@ use; see `backend/.env.example`-style comments in `backend/.env` for the AI prov
 and Claude CLI options).
 
 **Tests** — `cd backend && pytest` (spins up its own throwaway SQLite DB, no setup
-needed) and `npm test` (Vitest) from the repo root. Both run in CI on every push/PR to
+needed) and `cd frontend && npm test` (Vitest). Both run in CI on every push/PR to
 `main` (`.github/workflows/ci.yml`), alongside `npm run lint` and `npm run build`. See
 [`docs/testing.md`](docs/testing.md) for what's covered, how the fixtures/mocking work,
 and how to add new tests.

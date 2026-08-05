@@ -69,7 +69,7 @@ cd sa-generator/backend
 python3.12 -m venv venv && source venv/bin/activate
 pip install -r requirements.txt
 
-cd ..
+cd ../frontend
 npm install
 npm run build
 ```
@@ -163,7 +163,7 @@ Description=SA Generator frontend
 After=network.target sagen-backend.service
 
 [Service]
-WorkingDirectory=/home/ec2-user/sa-generator
+WorkingDirectory=/home/ec2-user/sa-generator/frontend
 ExecStart=/usr/bin/npm start
 Restart=on-failure
 Environment=BACKEND_URL=http://127.0.0.1:8000

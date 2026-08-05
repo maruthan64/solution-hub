@@ -18,6 +18,11 @@ const AI_PROVIDER_OPTIONS: { value: AiProvider; label: string; hint: string }[] 
     label: "Claude CLI (local subprocess)",
     hint: "Shells out to `claude -p` on the machine running the backend, using your existing Claude Code login instead of API billing. Requires the claude CLI installed and logged in there.",
   },
+  {
+    value: "bedrock",
+    label: "AWS Bedrock",
+    hint: 'Calls litellm.completion() with a bedrock/ model (BEDROCK_MODEL in backend/.env, e.g. "bedrock/anthropic.claude-3-5-sonnet-..."). Credentials come from the backend\'s environment — AWS access keys, or, recommended, an IAM role attached to the EC2 instance running it, so nothing needs to be stored here.',
+  },
 ];
 
 export default function SettingsPage() {
@@ -159,7 +164,9 @@ export default function SettingsPage() {
 
       <Card title="API Keys">
         <Text type="secondary" className="text-sm">
-          Used by the FastAPI backend to authenticate outbound calls through LiteLLM.
+          Used by the FastAPI backend to authenticate outbound calls through LiteLLM. Not used
+          by AWS Bedrock, which authenticates via the backend&apos;s AWS credentials/IAM role
+          instead — leave this blank if you&apos;re using Bedrock.
         </Text>
         <Divider style={{ margin: "12px 0" }} />
         {settings?.apiKeyPreview && (
