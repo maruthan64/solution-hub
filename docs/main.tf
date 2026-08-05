@@ -258,8 +258,25 @@ resource "aws_instance" "app" {
     #!/bin/bash
     set -e
     export DEBIAN_FRONTEND=noninteractive
+
+    # t4g.micro/t3.micro only has 1GB RAM and ships with no swap — `next build`
+    # alone regularly exceeds that and gets SIGKILLed by the OOM killer. A 2GB
+    # swapfile is enough headroom to get through the frontend build.
+    fallocate -l 2G /swapfile
+    chmod 600 /swapfile
+    mkswap /swapfile
+    swapon /swapfile
+    echo '/swapfile none swap sw 0 0' >> /etc/fstab
+
     apt-get update -y
-    apt-get install -y python3.12 python3.12-venv python3-pip nodejs npm git postgresql nginx certbot python3-certbot-nginx
+    apt-get install -y python3.12 python3.12-venv python3-pip git postgresql nginx certbot python3-certbot-nginx
+
+    # Ubuntu 24.04's own nodejs package is v18, which is too old for
+    # @tailwindcss/oxide (requires Node >= 20) and fails the frontend build with
+    # a "Cannot find native binding" error. Install Node 20 LTS via NodeSource
+    # instead of the apt-provided nodejs/npm packages.
+    curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
+    apt-get install -y nodejs
 
     # Ubuntu's postgresql package auto-initializes and starts a cluster on install
     # (unlike Amazon Linux's postgresqlNN-server, which needs an explicit initdb step).

@@ -7,6 +7,27 @@ through commit history.
 
 ## Unreleased
 
+## 2026-08-05 — First live deployment; Capability.id column-width fix
+
+- **Deployed to AWS**: CloudSolution Hub is now running on the EC2 instance provisioned
+  by `docs/main.tf` (Ubuntu 24.04, Postgres, nginx reverse proxy), reachable at its
+  Elastic IP over plain HTTP. Backend and frontend each run under their own systemd unit
+  (`sagen-backend`, `sagen-frontend`), both bound to `127.0.0.1` with nginx as the only
+  thing exposed publicly.
+- **Fixed `Capability.id` (`backend/app/models.py`)**: was `String(32)`, too narrow for
+  `seed.py`'s longer human-readable capability slugs (e.g.
+  `cap-kubernetes-container-platforms`, 35 chars). Never surfaced locally because SQLite
+  doesn't enforce `VARCHAR` length — only broke once seeding against real Postgres.
+  Widened to `String(64)`.
+- **`docs/main.tf` / `docs/deploy_aws.md` corrected from what the live deploy actually
+  needed**: Ubuntu's own `nodejs` apt package is v18, too old for `@tailwindcss/oxide`
+  (needs Node >= 20) and fails the frontend build with a "Cannot find native binding"
+  error — `user_data` now installs Node 20 via NodeSource instead. Also added a 2GB
+  swapfile: t4g.micro/t3.micro's 1GB RAM isn't enough headroom for `next build`, which
+  was getting OOM-killed. Systemd unit templates in `docs/deploy_aws.md` now include
+  `User=ubuntu` (the original templates had no `User=`, meaning both processes would
+  otherwise run as root).
+
 ## 2026-08-05 — AWS Bedrock as an AI provider; frontend moved into frontend/
 
 - **AWS Bedrock**: Settings now has a third AI provider option alongside LiteLLM and

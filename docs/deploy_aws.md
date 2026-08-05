@@ -62,7 +62,17 @@ These are the right tradeoffs for "minimize billing" — just going in with eyes
 
 ```bash
 sudo dnf install -y python3.12 nodejs git nginx   # Amazon Linux 2023
-# or: sudo apt install -y python3.12 python3.12-venv nodejs npm git nginx  # Ubuntu
+# or on Ubuntu: apt's own `nodejs` package is v18, which is too old for
+# @tailwindcss/oxide (needs >= 20) and fails the frontend build with a
+# "Cannot find native binding" error — install Node 20 LTS via NodeSource:
+#   curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
+#   sudo apt install -y python3.12 python3.12-venv nodejs git nginx
+
+# t4g.micro/t3.micro only has 1GB RAM with no swap by default — `next build`
+# alone can exceed that and get OOM-killed. Add a 2GB swapfile first:
+#   sudo fallocate -l 2G /swapfile && sudo chmod 600 /swapfile
+#   sudo mkswap /swapfile && sudo swapon /swapfile
+#   echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab
 
 git clone <your-repo-url> sa-generator
 cd sa-generator/backend
@@ -147,6 +157,7 @@ Description=SA Generator backend
 After=network.target
 
 [Service]
+User=ubuntu
 WorkingDirectory=/home/ubuntu/sa-generator/backend
 ExecStart=/home/ubuntu/sa-generator/backend/venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8000
 Restart=on-failure
@@ -163,6 +174,7 @@ Description=SA Generator frontend
 After=network.target sagen-backend.service
 
 [Service]
+User=ubuntu
 WorkingDirectory=/home/ubuntu/sa-generator/frontend
 ExecStart=/usr/bin/npm start
 Restart=on-failure
