@@ -9,7 +9,7 @@ from app.schemas import ApiKeyUpdate, OrgSettingsUpdate, SettingsOut, SettingsUp
 
 router = APIRouter(prefix="/api/settings", tags=["settings"])
 
-VALID_AI_PROVIDERS = {"litellm", "claude_cli"}
+VALID_AI_PROVIDERS = {"litellm", "claude_cli", "bedrock"}
 
 
 def get_or_create(db: Session) -> AppSettings:

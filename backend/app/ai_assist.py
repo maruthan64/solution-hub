@@ -7,6 +7,15 @@ import litellm
 
 from app.claude_cli import resolve_claude_binary
 
+
+def _resolve_model(provider: str) -> str:
+    """Bedrock is just another litellm.completion() model string (a bedrock/... one) with its
+    own env var, so it shares every _via_litellm function below rather than duplicating them."""
+    if provider == "bedrock":
+        return os.getenv("BEDROCK_MODEL", "bedrock/anthropic.claude-3-haiku-20240307-v1:0")
+    return os.getenv("LITELLM_MODEL", "gpt-4o-mini")
+
+
 SYSTEM_PROMPT = (
     "You are an assistant helping a solution architect fill in a cloud solution documentation "
     "template. The caller inserts your response directly into the document, so you must always "
@@ -20,8 +29,8 @@ SYSTEM_PROMPT = (
 )
 
 
-def _draft_via_litellm(current_content: str, instruction: str) -> str:
-    model = os.getenv("LITELLM_MODEL", "gpt-4o-mini")
+def _draft_via_litellm(current_content: str, instruction: str, provider: str = "litellm") -> str:
+    model = _resolve_model(provider)
     try:
         response = litellm.completion(
             model=model,
@@ -35,8 +44,8 @@ def _draft_via_litellm(current_content: str, instruction: str) -> str:
         )
     except Exception as exc:  # noqa: BLE001 - surface provider errors verbatim to the caller
         raise RuntimeError(
-            f"{exc} — configure a provider API key in backend/.env (model is '{model}'), "
-            f"or switch to Claude CLI mode in Settings."
+            f"{exc} — check the credentials for '{model}' in backend/.env (a provider API key for "
+            f"LiteLLM, or AWS credentials/an IAM role for Bedrock), or switch providers in Settings."
         ) from exc
 
     return response["choices"][0]["message"]["content"]
@@ -72,7 +81,7 @@ def _draft_via_claude_cli(current_content: str, instruction: str) -> str:
 def draft_content(current_content: str, instruction: str, provider: str = "litellm") -> str:
     if provider == "claude_cli":
         return _draft_via_claude_cli(current_content, instruction)
-    return _draft_via_litellm(current_content, instruction)
+    return _draft_via_litellm(current_content, instruction, provider)
 
 
 DIAGRAM_SYSTEM_PROMPT_TEMPLATE = (
@@ -121,8 +130,8 @@ def _diagram_system_prompt(cloud: str) -> str:
     return DIAGRAM_SYSTEM_PROMPT_TEMPLATE.format(cloud=cloud or "generic", stencil_hint=stencil_hint)
 
 
-def _draft_diagram_via_litellm(instruction: str, cloud: str) -> str:
-    model = os.getenv("LITELLM_MODEL", "gpt-4o-mini")
+def _draft_diagram_via_litellm(instruction: str, cloud: str, provider: str = "litellm") -> str:
+    model = _resolve_model(provider)
     try:
         response = litellm.completion(
             model=model,
@@ -133,8 +142,8 @@ def _draft_diagram_via_litellm(instruction: str, cloud: str) -> str:
         )
     except Exception as exc:  # noqa: BLE001 - surface provider errors verbatim to the caller
         raise RuntimeError(
-            f"{exc} — configure a provider API key in backend/.env (model is '{model}'), "
-            f"or switch to Claude CLI mode in Settings."
+            f"{exc} — check the credentials for '{model}' in backend/.env (a provider API key for "
+            f"LiteLLM, or AWS credentials/an IAM role for Bedrock), or switch providers in Settings."
         ) from exc
 
     return response["choices"][0]["message"]["content"]
@@ -178,7 +187,11 @@ def _extract_xml(raw: str) -> str:
 
 
 def draft_diagram_xml(instruction: str, cloud: str, provider: str = "litellm") -> str:
-    raw = _draft_diagram_via_claude_cli(instruction, cloud) if provider == "claude_cli" else _draft_diagram_via_litellm(instruction, cloud)
+    raw = (
+        _draft_diagram_via_claude_cli(instruction, cloud)
+        if provider == "claude_cli"
+        else _draft_diagram_via_litellm(instruction, cloud, provider)
+    )
 
     xml_text = _extract_xml(raw)
     try:
@@ -200,8 +213,8 @@ CHAT_SYSTEM_PROMPT = (
 )
 
 
-def _chat_via_litellm(messages: list[dict[str, str]]) -> str:
-    model = os.getenv("LITELLM_MODEL", "gpt-4o-mini")
+def _chat_via_litellm(messages: list[dict[str, str]], provider: str = "litellm") -> str:
+    model = _resolve_model(provider)
     try:
         response = litellm.completion(
             model=model,
@@ -209,8 +222,8 @@ def _chat_via_litellm(messages: list[dict[str, str]]) -> str:
         )
     except Exception as exc:  # noqa: BLE001 - surface provider errors verbatim to the caller
         raise RuntimeError(
-            f"{exc} — configure a provider API key in backend/.env (model is '{model}'), "
-            f"or switch to Claude CLI mode in Settings."
+            f"{exc} — check the credentials for '{model}' in backend/.env (a provider API key for "
+            f"LiteLLM, or AWS credentials/an IAM role for Bedrock), or switch providers in Settings."
         ) from exc
 
     return response["choices"][0]["message"]["content"]
@@ -247,7 +260,7 @@ def _chat_via_claude_cli(messages: list[dict[str, str]]) -> str:
 def chat_reply(messages: list[dict[str, str]], provider: str = "litellm") -> str:
     if provider == "claude_cli":
         return _chat_via_claude_cli(messages)
-    return _chat_via_litellm(messages)
+    return _chat_via_litellm(messages, provider)
 
 
 EXTRACT_PROJECT_SYSTEM_PROMPT = (
@@ -274,8 +287,8 @@ def _extract_json(raw: str) -> str:
     return text.strip()
 
 
-def _extract_project_via_litellm(messages: list[dict[str, str]]) -> str:
-    model = os.getenv("LITELLM_MODEL", "gpt-4o-mini")
+def _extract_project_via_litellm(messages: list[dict[str, str]], provider: str = "litellm") -> str:
+    model = _resolve_model(provider)
     try:
         response = litellm.completion(
             model=model,
@@ -283,8 +296,8 @@ def _extract_project_via_litellm(messages: list[dict[str, str]]) -> str:
         )
     except Exception as exc:  # noqa: BLE001 - surface provider errors verbatim to the caller
         raise RuntimeError(
-            f"{exc} — configure a provider API key in backend/.env (model is '{model}'), "
-            f"or switch to Claude CLI mode in Settings."
+            f"{exc} — check the credentials for '{model}' in backend/.env (a provider API key for "
+            f"LiteLLM, or AWS credentials/an IAM role for Bedrock), or switch providers in Settings."
         ) from exc
 
     return response["choices"][0]["message"]["content"]
@@ -322,7 +335,7 @@ def extract_project_from_chat(messages: list[dict[str, str]], provider: str = "l
     raw = (
         _extract_project_via_claude_cli(messages)
         if provider == "claude_cli"
-        else _extract_project_via_litellm(messages)
+        else _extract_project_via_litellm(messages, provider)
     )
 
     text = _extract_json(raw)
