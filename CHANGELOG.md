@@ -7,6 +7,24 @@ through commit history.
 
 ## Unreleased
 
+## 2026-08-06 — Fixed New Template's "Starting Content" upload crashing on bad files
+
+- **Root cause**: `create_template`'s file-to-text extraction only caught `ValueError`
+  (raised for genuinely unsupported extensions like `.doc`) but not the exceptions
+  `python-docx` raises for a `.docx` that isn't actually a valid OOXML package — a
+  renamed `.doc`, a corrupted upload, anything malformed — which crashed with an
+  unhandled 500 instead of a clean error.
+- Broadened the exception handling to catch any extraction failure and return a clean
+  400 with an actionable message ("re-save it as .docx and try again, or leave the
+  upload empty").
+- The New Template modal's file picker also advertised `.doc` as accepted
+  (`accept=".pdf,.doc,.docx,.md,.txt"`), which could never work — there's no `.doc`
+  parser anywhere in this codebase, only `.docx`/`.pdf`/`.md`/`.txt`. Removed `.doc` from
+  the accepted types and said so explicitly in the hint text, rather than advertising
+  support that silently failed. (Knowledge Base and Project source-document uploads are
+  unaffected — those just store the file for later download, they never parse it, so
+  `.doc` genuinely works there.)
+
 ## 2026-08-06 — Forced password rotation on first login; a global search bar
 
 - **Forced password change**: `admin`/`admin123` (and any account an Owner invites or

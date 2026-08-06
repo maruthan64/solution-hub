@@ -68,6 +68,14 @@ def create_template(
             content = extract_text(document.filename, raw)
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
+        except Exception as exc:  # noqa: BLE001 - a malformed upload must never 500, always a clean 400
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    "Couldn't read that file. If it's an older .doc file, re-save it as .docx and try "
+                    "again, or leave the upload empty to start from a blank template."
+                ),
+            ) from exc
         if not content.strip():
             raise HTTPException(status_code=400, detail="Couldn't extract any text from that file.")
 

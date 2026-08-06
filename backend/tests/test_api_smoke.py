@@ -1,4 +1,7 @@
+import io
 import uuid
+
+import docx
 
 from app.models import DocTemplate, GeneratedDocument, KnowledgeDoc, Project
 from app.routers import chat as chat_router
@@ -437,3 +440,48 @@ class TestGlobalSearch:
     def test_requires_auth(self, client):
         resp = client.get("/api/search?q=anything")
         assert resp.status_code == 401
+
+
+class TestCreateTemplateFromUpload:
+    def test_valid_docx_extracts_its_text(self, auth_client):
+        buf = io.BytesIO()
+        doc = docx.Document()
+        doc.add_paragraph("Section One")
+        doc.add_paragraph("Some real content pulled from the uploaded file.")
+        doc.save(buf)
+        buf.seek(0)
+
+        resp = auth_client.post(
+            "/api/templates",
+            data={"name": "Uploaded Template", "cloud": "AWS", "description": ""},
+            files={"document": ("template.docx", buf, "application/vnd.openxmlformats-officedocument.wordprocessingml.document")},
+        )
+        assert resp.status_code == 201
+        assert "Some real content pulled from the uploaded file." in resp.json()["content"]
+
+    def test_legacy_doc_extension_returns_clean_400_not_500(self, auth_client):
+        resp = auth_client.post(
+            "/api/templates",
+            data={"name": "Legacy Doc Template", "cloud": "AWS", "description": ""},
+            files={"document": ("template.doc", io.BytesIO(b"not a real doc file"), "application/msword")},
+        )
+        assert resp.status_code == 400
+        assert ".doc" in resp.json()["detail"]
+
+    def test_malformed_docx_returns_clean_400_not_500(self, auth_client):
+        # A .docx that isn't actually a valid zip/OOXML package — e.g. a renamed .doc,
+        # or a corrupted upload. python-docx raises PackageNotFoundError here, not
+        # ValueError, so this exercises the broad except-Exception fallback specifically.
+        resp = auth_client.post(
+            "/api/templates",
+            data={"name": "Corrupt Template", "cloud": "AWS", "description": ""},
+            files={
+                "document": (
+                    "template.docx",
+                    io.BytesIO(b"this is not a real docx file"),
+                    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                )
+            },
+        )
+        assert resp.status_code == 400
+        assert "Couldn't read that file" in resp.json()["detail"]

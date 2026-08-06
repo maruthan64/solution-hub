@@ -104,15 +104,15 @@ export default function NewTemplateModal({
               beforeUpload={() => false}
               onChange={({ fileList: fl }) => setFileList(fl.slice(-1))}
               maxCount={1}
-              accept=".pdf,.doc,.docx,.md,.txt"
+              accept=".pdf,.docx,.md,.txt"
             >
               <p className="ant-upload-drag-icon">
                 <InboxOutlined />
               </p>
               <p className="ant-upload-text">Click or drag an existing document</p>
               <p className="ant-upload-hint text-gray-400">
-                PDF, Word, or Markdown — its text becomes the template&apos;s starting content. Leave empty to start
-                from a blank template.
+                PDF, Word (.docx), or Markdown — its text becomes the template&apos;s starting content. Older .doc
+                files aren&apos;t supported — save as .docx first. Leave empty to start from a blank template.
               </p>
             </Upload.Dragger>
           </Form.Item>
