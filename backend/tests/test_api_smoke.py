@@ -459,6 +459,74 @@ class TestCreateTemplateFromUpload:
         assert resp.status_code == 201
         assert "Some real content pulled from the uploaded file." in resp.json()["content"]
 
+    def test_docx_headings_become_markdown_headings(self, auth_client):
+        buf = io.BytesIO()
+        doc = docx.Document()
+        doc.add_heading("Executive Summary", level=1)
+        doc.add_paragraph("Body text under the heading.")
+        doc.save(buf)
+        buf.seek(0)
+
+        resp = auth_client.post(
+            "/api/templates",
+            data={"name": "Heading Template", "cloud": "AWS", "description": ""},
+            files={"document": ("template.docx", buf, "application/vnd.openxmlformats-officedocument.wordprocessingml.document")},
+        )
+        assert resp.status_code == 201
+        assert "# Executive Summary" in resp.json()["content"]
+
+    def test_docx_tables_are_preserved_not_silently_dropped(self, auth_client):
+        # Regression test for the actual bug: document.paragraphs (the old
+        # extraction path) doesn't include tables at all, so a table's content
+        # used to vanish entirely with no error and no trace.
+        buf = io.BytesIO()
+        doc = docx.Document()
+        doc.add_paragraph("Contacts")
+        table = doc.add_table(rows=2, cols=2)
+        table.rows[0].cells[0].text = "Name"
+        table.rows[0].cells[1].text = "Email"
+        table.rows[1].cells[0].text = "Jane Doe"
+        table.rows[1].cells[1].text = "jane@example.com"
+        doc.save(buf)
+        buf.seek(0)
+
+        resp = auth_client.post(
+            "/api/templates",
+            data={"name": "Table Template", "cloud": "AWS", "description": ""},
+            files={"document": ("template.docx", buf, "application/vnd.openxmlformats-officedocument.wordprocessingml.document")},
+        )
+        assert resp.status_code == 201
+        content = resp.json()["content"]
+        assert "jane@example.com" in content
+        assert "Jane Doe" in content
+
+    def test_embedded_images_are_stripped_not_left_as_dangling_markdown(self, auth_client):
+        from PIL import Image
+
+        img_buf = io.BytesIO()
+        Image.new("RGB", (2, 2), color="red").save(img_buf, format="PNG")
+        img_buf.seek(0)
+
+        buf = io.BytesIO()
+        doc = docx.Document()
+        doc.add_paragraph("Before the image.")
+        doc.add_picture(img_buf)
+        doc.add_paragraph("After the image.")
+        doc.save(buf)
+        buf.seek(0)
+
+        resp = auth_client.post(
+            "/api/templates",
+            data={"name": "Image Template", "cloud": "AWS", "description": ""},
+            files={"document": ("template.docx", buf, "application/vnd.openxmlformats-officedocument.wordprocessingml.document")},
+        )
+        assert resp.status_code == 201
+        content = resp.json()["content"]
+        assert "Before the image." in content
+        assert "After the image." in content
+        assert "![" not in content
+        assert "base64" not in content
+
     def test_legacy_doc_extension_returns_clean_400_not_500(self, auth_client):
         resp = auth_client.post(
             "/api/templates",

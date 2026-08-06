@@ -7,6 +7,30 @@ through commit history.
 
 ## Unreleased
 
+## 2026-08-06 — Word upload now preserves headings, bold text, and tables
+
+`extract_docx_text` used to be `document.paragraphs` joined with blank lines — plain
+text only. Headings were indistinguishable from body text, bold/italic formatting was
+stripped, and tables weren't even read (`document.paragraphs` excludes them entirely, so
+a table's content just vanished with no error and no trace). Verified against a real
+276-paragraph, 18-table company Statement of Work template — previously all 18 tables
+disappeared silently.
+
+- Replaced the hand-rolled extraction with `mammoth` (.docx → HTML, actually understands
+  Word's structure) → `markdownify` (HTML → our markdown syntax), instead of re-inventing
+  that understanding ourselves.
+- Embedded images are stripped rather than kept as inline base64 — a handful of images
+  can otherwise bloat a converted document from ~30KB to 1MB+, which both makes the raw
+  editor unreadable and blows past reasonable limits the moment "Ask AI" sends the whole
+  document as context.
+- Fixed a Mammoth quirk found along the way: it never marks any table row as a header
+  (plain `<td>` even for visually-bold header rows), so `markdownify` fabricated an empty
+  header row to satisfy markdown's table syntax, pushing the real header into the first
+  data row. Now the first row of each table is promoted to a real header before
+  conversion.
+- New dependencies: `mammoth`, `markdownify`, `beautifulsoup4` (all pure Python, no
+  system-level dependencies — safe to add without touching the EC2 setup docs).
+
 ## 2026-08-06 — Fixed New Template's "Starting Content" upload crashing on bad files
 
 - **Root cause**: `create_template`'s file-to-text extraction only caught `ValueError`
