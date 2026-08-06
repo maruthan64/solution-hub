@@ -43,7 +43,9 @@ These are the right tradeoffs for "minimize billing" — just going in with eyes
 ## Before you deploy: decide on the AI provider
 
 - **AWS Bedrock mode** — a direct HTTPS call to the Bedrock Runtime Converse API using an AWS Bedrock API key (a bearer token you generate from the Bedrock console's API keys page, not an Access Key ID/Secret Access Key pair, and no boto3 needed). Works anywhere. Use this for AWS.
-- **Claude CLI mode** shells out to a local `claude` binary using *your* logged-in session on *this* machine. It won't work on a fresh EC2 instance without repeating that login manually, and there's no cost benefit to it over Bedrock (you still pay per-token via whatever plan is behind that login) — so for a cost-minimal deploy, just use Bedrock with a Haiku/Sonnet-class model, which is inexpensive per-request for occasional internal use.
+- **Claude CLI mode** shells out to a `claude` binary and login session that must exist **on the instance itself**, not on your laptop — a fresh EC2 box won't have either. There's no cost benefit to it over Bedrock (you still pay per-token via whatever plan is behind that login), and the login is an interactive, human step you'd have to redo on that server whenever it expires — so for a cost-minimal, low-maintenance deploy, just use Bedrock with a Haiku/Sonnet-class model, which is inexpensive per-request for occasional internal use.
+
+**Prerequisite if you do choose Claude CLI**: install the CLI on the instance (e.g. `npm install -g @anthropic-ai/claude-code`) and run `claude login` there — it supports completing the OAuth step from another device if the instance is headless. Use Settings → AI Provider → Test Connection after deploying to confirm it's actually working before relying on it; "the CLI is installed on my laptop" does not count.
 
 ## Step by step
 
@@ -89,7 +91,7 @@ npm run build
 **Option A: SQLite (cheapest, simplest, recommended to start)**
 Nothing to install — it's already what the app uses in dev. Just make sure `backend/.env` has `DATABASE_URL=sqlite:///./sagenerator.db` and that `backend/sagenerator.db` lives on the EBS volume (it does, by default). See **Backups** below — there's no automated backup story here, so do this manually on a schedule.
 
-**Option B: Postgres, installed natively — still no RDS bill, no Docker either.** This is what `docs/main.tf` sets up automatically via `user_data` if you're using that Terraform file; the commands below are the same thing done by hand:
+**Option B: Postgres, installed natively — still no RDS bill, no Docker either.** This is what `main.tf` (in this same folder) sets up automatically via `user_data` if you're using that Terraform file; the commands below are the same thing done by hand:
 ```bash
 sudo dnf install -y postgresql16-server postgresql16
 sudo postgresql-16-setup --initdb
@@ -189,6 +191,24 @@ sudo systemctl enable --now sagen-backend sagen-frontend
 ```
 
 Both bind to `127.0.0.1` only — nginx is the one thing actually exposed to the internet.
+
+### Starting, stopping, and redeploying
+
+`docs/ec2/sagen.sh` (checked into the repo, so it comes along with `git clone`/`git pull`) wraps the systemd/rebuild commands above so you don't have to retype them by hand:
+
+```bash
+cd ~/sa-generator
+bash docs/ec2/sagen.sh start      # start both services
+bash docs/ec2/sagen.sh stop       # stop both services
+bash docs/ec2/sagen.sh restart    # restart both (no code changes)
+bash docs/ec2/sagen.sh status     # systemctl status for both
+bash docs/ec2/sagen.sh logs       # tail both services' logs, Ctrl+C to stop
+bash docs/ec2/sagen.sh deploy     # git pull, pip install, npm build, restart, health-check
+```
+
+(Invoked via `bash` rather than `./sagen.sh` so it doesn't depend on the executable bit surviving a Windows-checked-out `git clone`/`git pull`. `chmod +x docs/ec2/sagen.sh` once on the instance if you'd rather run it directly.)
+
+`deploy` is the one you'll use most — it's every step from "ship a code change" to "it's live" in one command: pull, reinstall backend deps, rebuild the frontend, restart both services, then curl both health endpoints so you know immediately if something broke. Run it from the instance itself (over SSH), not your laptop.
 
 ### 6. nginx + free TLS via Let's Encrypt
 

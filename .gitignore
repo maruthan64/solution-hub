@@ -18,8 +18,8 @@ tsconfig.tsbuildinfo
 # attribute, including ones from variables marked sensitive (e.g. db_password), so it
 # must never be committed. .terraform.lock.hcl is the one exception: that's just
 # provider version pinning, not sensitive, and should stay tracked.
-docs/.terraform/
-docs/terraform.tfstate
-docs/terraform.tfstate.backup
-docs/*.tfplan
-docs/*.tfvars
+docs/ec2/.terraform/
+docs/ec2/terraform.tfstate
+docs/ec2/terraform.tfstate.backup
+docs/ec2/*.tfplan
+docs/ec2/*.tfvars
