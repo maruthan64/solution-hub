@@ -7,6 +7,20 @@ through commit history.
 
 ## Unreleased
 
+## 2026-08-06 — Consolidated deploy docs into docs/ec2/; added a service-control script
+
+- Moved `main.tf`, `.terraform.lock.hcl`, and `deploy_aws.md` into a new `docs/ec2/`
+  folder instead of leaving them scattered directly under `docs/` alongside the
+  general-purpose `testing.md`.
+- Added `docs/ec2/sagen.sh`: `start` / `stop` / `restart` / `status` / `logs` / `deploy`
+  subcommands wrapping the systemd + rebuild steps documented in `deploy_aws.md` —
+  `deploy` alone does `git pull` → reinstall backend deps → rebuild frontend → restart
+  both services → health-check both, replacing a sequence that had been typed by hand
+  over SSH repeatedly.
+- `deploy_aws.md` now states the Claude CLI provider's prerequisite explicitly: the CLI
+  and its login have to exist **on the EC2 instance**, not the operator's laptop, and
+  Settings → AI Provider → Test Connection is how you confirm that rather than assume it.
+
 ## 2026-08-06 — Removed LiteLLM/boto3; AWS Bedrock now calls the API directly
 
 - **Dropped `litellm` and `boto3` as dependencies entirely.** Bedrock was previously
