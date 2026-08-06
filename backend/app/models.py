@@ -1,6 +1,6 @@
 from datetime import datetime, timezone
 
-from sqlalchemy import JSON, DateTime, Integer, String, Text
+from sqlalchemy import JSON, Boolean, DateTime, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.database import Base
@@ -20,6 +20,10 @@ class User(Base):
     role: Mapped[str] = mapped_column(String(32))
     status: Mapped[str] = mapped_column(String(32), default="Active")
     password_hash: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    # True whenever the current password was set by someone/something other than the
+    # user themselves (initial seed, an Owner's invite, an Owner's reset) — cleared only
+    # by the user successfully changing their own password via /api/auth/change-password.
+    must_change_password: Mapped[bool] = mapped_column(Boolean, default=True, server_default="true")
 
 
 class Project(Base):

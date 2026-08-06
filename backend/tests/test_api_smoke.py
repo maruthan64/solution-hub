@@ -1,6 +1,6 @@
 import uuid
 
-from app.models import GeneratedDocument, Project
+from app.models import DocTemplate, GeneratedDocument, KnowledgeDoc, Project
 from app.routers import chat as chat_router
 from app.routers import settings as settings_router
 
@@ -34,6 +34,48 @@ class TestLoginLockout:
             )
             last_status = resp.status_code
         assert last_status == 429
+
+
+class TestChangePassword:
+    def test_new_user_must_change_password(self, client, make_user):
+        user, password = make_user()
+        client.post("/api/auth/login", json={"username": user.username, "password": password})
+        resp = client.get("/api/auth/me")
+        assert resp.status_code == 200
+        assert resp.json()["mustChangePassword"] is True
+
+    def test_change_password_clears_the_flag_and_new_password_works(self, client, make_user):
+        user, password = make_user()
+        client.post("/api/auth/login", json={"username": user.username, "password": password})
+
+        resp = client.post(
+            "/api/auth/change-password",
+            json={"currentPassword": password, "newPassword": "a-brand-new-password"},
+        )
+        assert resp.status_code == 200
+        assert resp.json()["mustChangePassword"] is False
+
+        client.post("/api/auth/logout")
+        relogin = client.post(
+            "/api/auth/login", json={"username": user.username, "password": "a-brand-new-password"}
+        )
+        assert relogin.status_code == 200
+
+    def test_wrong_current_password_rejected(self, client, make_user):
+        user, password = make_user()
+        client.post("/api/auth/login", json={"username": user.username, "password": password})
+
+        resp = client.post(
+            "/api/auth/change-password",
+            json={"currentPassword": "not-the-real-password", "newPassword": "a-brand-new-password"},
+        )
+        assert resp.status_code == 400
+
+    def test_requires_auth(self, client):
+        resp = client.post(
+            "/api/auth/change-password", json={"currentPassword": "x", "newPassword": "y" * 8}
+        )
+        assert resp.status_code == 401
 
 
 class TestRoleEnforcement:
@@ -330,3 +372,68 @@ class TestSettingsTestConnection:
         client.post("/api/auth/login", json={"username": user.username, "password": password})
         resp = client.post("/api/settings/test-connection", json={"provider": "claude_cli"})
         assert resp.status_code == 403
+
+
+class TestGlobalSearch:
+    def test_finds_matches_across_categories(self, auth_client, db_session):
+        stamp = uuid.uuid4().hex[:8]
+        db_session.add(
+            Project(
+                id=f"prj-{stamp}",
+                name=f"Zephyr-{stamp} Migration",
+                customer="Zephyr Corp",
+                cloud="AWS",
+                status="Draft",
+                owner="Tester",
+                updated="2026-01-01",
+                docs_generated=0,
+                description="",
+            )
+        )
+        db_session.add(
+            GeneratedDocument(
+                id=f"doc-{stamp}",
+                project=f"Zephyr-{stamp} Migration",
+                type="SDD",
+                title=f"Zephyr-{stamp} Solution Design",
+                version="1.0",
+                updated="2026-01-01",
+                status="Draft",
+            )
+        )
+        db_session.add(
+            DocTemplate(
+                id=f"tpl-{stamp}",
+                name=f"Zephyr-{stamp} Template",
+                cloud="AWS",
+                sections=1,
+                description="d",
+                content="c",
+            )
+        )
+        db_session.add(
+            KnowledgeDoc(
+                id=f"kb-{stamp}",
+                name=f"Zephyr-{stamp} Standards.pdf",
+                category="Standards",
+                uploaded_by="Tester",
+                uploaded="2026-01-01",
+                size="1 KB",
+            )
+        )
+        db_session.commit()
+
+        resp = auth_client.get(f"/api/search?q=Zephyr-{stamp}")
+        assert resp.status_code == 200
+        results = resp.json()
+        types_found = {r["type"] for r in results}
+        assert types_found == {"project", "document", "template", "knowledge"}
+
+    def test_short_query_returns_empty(self, auth_client):
+        resp = auth_client.get("/api/search?q=a")
+        assert resp.status_code == 200
+        assert resp.json() == []
+
+    def test_requires_auth(self, client):
+        resp = client.get("/api/search?q=anything")
+        assert resp.status_code == 401

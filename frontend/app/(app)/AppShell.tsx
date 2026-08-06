@@ -6,6 +6,10 @@ import Link from "next/link";
 import { Layout, Menu, Avatar, Dropdown, Typography } from "antd";
 import { LogoutOutlined, UserOutlined } from "@ant-design/icons";
 import { NAV_ITEMS } from "@/lib/nav";
+import { getCurrentUser } from "@/lib/api";
+import { useApi } from "@/lib/useApi";
+import GlobalSearch from "@/components/GlobalSearch";
+import ChangePasswordGate from "@/components/ChangePasswordGate";
 
 const { Sider, Header, Content } = Layout;
 const { Text } = Typography;
@@ -14,6 +18,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   const [collapsed, setCollapsed] = useState(false);
   const pathname = usePathname();
   const router = useRouter();
+  const { data: user, refetch } = useApi(getCurrentUser);
 
   const activeKey =
     NAV_ITEMS.find((item) => item.key !== "/" && pathname.startsWith(item.key))?.key ??
@@ -26,6 +31,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
   return (
     <Layout className="min-h-screen">
+      {user?.mustChangePassword && <ChangePasswordGate onDone={() => refetch()} />}
       <Sider collapsible collapsed={collapsed} onCollapse={setCollapsed} theme="light" width={232}>
         <div className="h-16 flex items-center justify-center border-b border-gray-200">
           <span className="text-xl font-semibold whitespace-nowrap overflow-hidden">
@@ -45,7 +51,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       </Sider>
       <Layout>
         <Header className="!bg-white !px-6 flex items-center justify-between border-b border-gray-200">
-          <Text strong>AI Solution Documentation Portal</Text>
+          <GlobalSearch />
           <Dropdown
             menu={{
               items: [{ key: "logout", icon: <LogoutOutlined />, label: "Log out", onClick: handleLogout }],
@@ -54,7 +60,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           >
             <div className="flex items-center gap-2 cursor-pointer">
               <Avatar size="small" icon={<UserOutlined />} />
-              <Text>admin</Text>
+              <Text>{user?.name ?? "..."}</Text>
             </div>
           </Dropdown>
         </Header>

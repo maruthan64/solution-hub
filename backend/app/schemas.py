@@ -106,6 +106,12 @@ class CurrentUserOut(BaseModel):
     username: str
     email: str
     role: str
+    mustChangePassword: bool = False
+
+
+class ChangePasswordRequest(BaseModel):
+    currentPassword: str = Field(min_length=1)
+    newPassword: str = Field(min_length=8)
 
 
 class ReviewNoteRequest(BaseModel):
@@ -145,6 +151,14 @@ class TestConnectionRequest(BaseModel):
 class TestConnectionResult(BaseModel):
     ok: bool
     reply: str
+
+
+class SearchResult(BaseModel):
+    type: str  # "project" | "document" | "template" | "knowledge"
+    id: str
+    title: str
+    subtitle: str
+    url: str
 
 
 class ResourceLine(BaseModel):

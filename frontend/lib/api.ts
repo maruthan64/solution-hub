@@ -17,9 +17,15 @@ export interface CurrentUser {
   username: string;
   email: string;
   role: "Owner" | "Architect" | "Reviewer" | "Viewer";
+  mustChangePassword: boolean;
 }
 
 export const getCurrentUser = () => apiFetch<CurrentUser>("/api/auth/me");
+export const changePassword = (currentPassword: string, newPassword: string) =>
+  apiFetch<CurrentUser>("/api/auth/change-password", {
+    method: "POST",
+    body: JSON.stringify({ currentPassword, newPassword }),
+  });
 
 export class ApiError extends Error {}
 
@@ -316,3 +322,13 @@ export const getServerDetail = (name: string) =>
 
 export const removeServer = (name: string) =>
   apiFetch<{ ok: boolean }>(`/api/mcp/servers/${encodeURIComponent(name)}`, { method: "DELETE" });
+
+export interface SearchResult {
+  type: "project" | "document" | "template" | "knowledge";
+  id: string;
+  title: string;
+  subtitle: string;
+  url: string;
+}
+
+export const search = (q: string) => apiFetch<SearchResult[]>(`/api/search?q=${encodeURIComponent(q)}`);

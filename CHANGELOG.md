@@ -7,6 +7,22 @@ through commit history.
 
 ## Unreleased
 
+## 2026-08-06 — Forced password rotation on first login; a global search bar
+
+- **Forced password change**: `admin`/`admin123` (and any account an Owner invites or
+  resets) now sits behind a `must_change_password` flag — a blocking modal appears on
+  next login until the account holder sets their own password via a new self-service
+  `POST /api/auth/change-password` endpoint (previously the only password-changing
+  endpoint was Owner-resets-someone-else; there was no way for a user to change their
+  own password at all). Existing users get flagged retroactively by the migration
+  itself (`ALTER TABLE ... DEFAULT true` backfills existing rows on Postgres).
+- **Global search**: a search bar in the header (`GET /api/search?q=`) finds matches
+  across Projects, Documents, Templates, and Knowledge Base by name/title, grouped by
+  category, two or more characters, debounced. Previously the only way to find anything
+  was browsing to the right nav item and scanning its list.
+- Fixed the header's hardcoded "admin" label while touching this file — it now shows the
+  real logged-in user's name, same fix already applied to the Dashboard and AI Chat.
+
 ## 2026-08-06 — Dashboard: replaced two fake stats with real ones, added a review panel
 
 - **"AI Requests This Month: 1,284" and "Est. Monthly AI Cost: $253.30" were hardcoded

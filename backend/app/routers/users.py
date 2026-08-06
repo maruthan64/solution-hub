@@ -104,6 +104,7 @@ def reset_password(
         raise HTTPException(status_code=404, detail="User not found")
 
     user.password_hash = hash_password(payload.password)
+    user.must_change_password = True
     log_action(db, current_user.name, "Reset password for user", user.name)
     db.commit()
     db.refresh(user)

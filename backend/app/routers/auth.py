@@ -2,14 +2,25 @@ from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from sqlalchemy.orm import Session
 
 from app.audit import log_action
-from app.auth import create_token, require_user, verify_password
+from app.auth import create_token, hash_password, require_user, verify_password
 from app.database import get_db
 from app.models import User
 from app.rate_limit import reset as reset_rate_limit
 from app.rate_limit import record_attempt, seconds_until_allowed
-from app.schemas import CurrentUserOut, LoginRequest, LoginResponse
+from app.schemas import ChangePasswordRequest, CurrentUserOut, LoginRequest, LoginResponse
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
+
+
+def to_current_user_out(user: User) -> CurrentUserOut:
+    return CurrentUserOut(
+        id=user.id,
+        name=user.name,
+        username=user.username or "",
+        email=user.email or "",
+        role=user.role,
+        mustChangePassword=user.must_change_password,
+    )
 
 
 @router.post("/login", response_model=LoginResponse)
@@ -55,4 +66,24 @@ def me(user_id: str = Depends(require_user), db: Session = Depends(get_db)):
     user = db.get(User, user_id)
     if not user:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated")
-    return user
+    return to_current_user_out(user)
+
+
+@router.post("/change-password", response_model=CurrentUserOut)
+def change_password(
+    payload: ChangePasswordRequest,
+    user_id: str = Depends(require_user),
+    db: Session = Depends(get_db),
+):
+    user = db.get(User, user_id)
+    if not user:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated")
+    if not user.password_hash or not verify_password(payload.currentPassword, user.password_hash):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Current password is incorrect.")
+
+    user.password_hash = hash_password(payload.newPassword)
+    user.must_change_password = False
+    log_action(db, user.name, "Changed own password", "-")
+    db.commit()
+    db.refresh(user)
+    return to_current_user_out(user)

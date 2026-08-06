@@ -17,6 +17,7 @@ from app.routers import (
     knowledge_base,
     mcp_connectors,
     projects,
+    search,
     service_catalog,
     settings,
     templates,
@@ -49,6 +50,7 @@ app.include_router(settings.router)
 app.include_router(service_catalog.router)
 app.include_router(mcp_connectors.router)
 app.include_router(capabilities.router)
+app.include_router(search.router)
 
 
 @app.get("/api/health")
