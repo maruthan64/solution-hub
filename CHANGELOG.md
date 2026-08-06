@@ -7,6 +7,22 @@ through commit history.
 
 ## Unreleased
 
+## 2026-08-06 — Dashboard: replaced two fake stats with real ones, added a review panel
+
+- **"AI Requests This Month: 1,284" and "Est. Monthly AI Cost: $253.30" were hardcoded
+  constants** never computed from anything — removed. Replaced with **Pending Review**
+  (count of documents with status `In Review`) and **Quotes Generated** (real count from
+  a new `GET /api/service-catalog/quotes` endpoint, filtered to the current month).
+- New **Needs Your Review** panel lists documents actually awaiting review with a direct
+  link, rather than leaving the count as a number nobody can act on from the dashboard.
+- **"Welcome back, admin"** was hardcoded regardless of who logged in — now a real
+  time-of-day greeting using the current user's name (`getCurrentUser()`), via a small
+  shared `lib/greeting.ts` also used by the AI Chat page's empty-state greeting.
+- Found along the way: quotes are only persisted when generated with a `projectId` — a
+  standalone quote is generated and downloaded but never written to the `quotes` table.
+  `GET /api/service-catalog/quotes` necessarily only reflects project-linked quotes for
+  the same reason `GET /api/projects/{id}/quotes` always has.
+
 ## 2026-08-06 — Consolidated deploy docs into docs/ec2/; added a service-control script
 
 - Moved `main.tf`, `.terraform.lock.hcl`, and `deploy_aws.md` into a new `docs/ec2/`

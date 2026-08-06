@@ -22,6 +22,7 @@ import {
   sendChatMessage,
 } from "@/lib/api";
 import { useApi } from "@/lib/useApi";
+import { greeting } from "@/lib/greeting";
 import NewProjectModal from "@/components/NewProjectModal";
 
 const { Title, Text } = Typography;
@@ -39,12 +40,6 @@ const INITIAL_MESSAGES: ChatMessage[] = [
       "workload, and any constraints you already know — and I'll ask what's missing.",
   },
 ];
-
-function greeting(name?: string) {
-  const hour = new Date().getHours();
-  const time = hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
-  return name ? `${time}, ${name.split(" ")[0]}` : time;
-}
 
 export default function ChatPage() {
   const router = useRouter();

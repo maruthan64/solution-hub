@@ -78,6 +78,15 @@ def create_package(
     return to_out(p)
 
 
+@router.get("/quotes", response_model=list[QuoteOut])
+def list_all_quotes(db: Session = Depends(get_db), _user: str = Depends(require_user)):
+    # Registered before GET /{package_id} on purpose — Starlette matches routes in
+    # registration order, so a static "/quotes" path has to come before the dynamic
+    # "/{package_id}" one or every request here would 404 as "package 'quotes' not found".
+    quotes = db.query(Quote).order_by(Quote.created.desc()).all()
+    return [to_quote_out(q) for q in quotes]
+
+
 @router.get("/{package_id}", response_model=ServicePackageOut)
 def get_package(package_id: str, db: Session = Depends(get_db), _user: str = Depends(require_user)):
     p = db.get(ServicePackage, package_id)

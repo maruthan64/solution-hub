@@ -137,6 +137,60 @@ class TestQuoteProjectLinking:
         assert resp.status_code == 404
 
 
+class TestListAllQuotes:
+    def test_returns_quotes_across_projects(self, auth_client, db_session):
+        # Quotes are only persisted when generated with a projectId (see
+        # TestQuoteProjectLinking) — a standalone quote is generated and downloaded but
+        # never written to the quotes table, so this endpoint necessarily only reflects
+        # project-linked quotes too.
+        project = Project(
+            id=f"prj-{uuid.uuid4().hex[:8]}",
+            name="Dashboard Stat Test Project",
+            customer="Dashboard Test Customer",
+            cloud="AWS",
+            status="Draft",
+            owner="Tester",
+            updated="2026-01-01",
+            docs_generated=0,
+            description="",
+        )
+        db_session.add(project)
+        db_session.commit()
+
+        pkg_resp = auth_client.post(
+            "/api/service-catalog",
+            json={
+                "category": "addon",
+                "name": f"Addon {uuid.uuid4().hex[:6]}",
+                "tagline": "T",
+                "monthlyPrice": "$5/mo",
+                "resources": [],
+            },
+        )
+        package_id = pkg_resp.json()["id"]
+
+        quote_resp = auth_client.post(
+            "/api/service-catalog/quote",
+            json={
+                "customerName": "Dashboard Test Customer",
+                "description": "For the dashboard stat",
+                "packageIds": [package_id],
+                "format": "docx",
+                "projectId": project.id,
+            },
+        )
+        assert quote_resp.status_code == 200
+
+        resp = auth_client.get("/api/service-catalog/quotes")
+        assert resp.status_code == 200
+        quotes = resp.json()
+        assert any(q["customerName"] == "Dashboard Test Customer" for q in quotes)
+
+    def test_requires_auth(self, client):
+        resp = client.get("/api/service-catalog/quotes")
+        assert resp.status_code == 401
+
+
 class TestCostEstimate:
     def test_generate_then_regenerate_updates_the_same_document(self, auth_client, db_session):
         project = Project(
