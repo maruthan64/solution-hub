@@ -12,8 +12,8 @@ Replace ad-hoc, inconsistent architecture documentation with a single tool that:
 - Lets architects sell productized service tiers (Basic/Intermediate/Advanced +
   container/add-on packages) and turn a customer's selection into a branded quote
 - Centralizes templates, company standards (Knowledge Base), and audit history
-- Routes AI drafting through a swappable backend (hosted LLM via LiteLLM, or a local
-  Claude Code CLI subprocess) so it isn't locked to one provider
+- Routes AI drafting through a swappable backend (AWS Bedrock via a direct API key, or a
+  local Claude Code CLI subprocess) so it isn't locked to one provider
 
 ## Components
 
@@ -110,8 +110,8 @@ Logs (a real log of every write action), Settings (AI provider, org info, API ke
 Postgres-compatible and `docker-compose.yml` provisions a Postgres container for when
 you're ready to switch (`DATABASE_URL` in `backend/.env`)
 
-**AI** — [LiteLLM](https://github.com/BerriAI/litellm) (provider-agnostic — OpenAI,
-Anthropic, Bedrock, Ollama, etc. via `LITELLM_MODEL` + a provider key) **or** a local
+**AI** — AWS Bedrock (a direct HTTPS call to the Bedrock Runtime Converse API using an
+AWS Bedrock API key bearer token — no boto3, no AWS SigV4 signing) **or** a local
 `claude -p` subprocess using your existing Claude Code login. Selectable per-deployment
 in Settings → AI Assistant.
 
@@ -135,7 +135,7 @@ Next.js (:3000) ── same-origin fetch, credentials via cookie
 FastAPI (:8000)
   │
   ├── SQLAlchemy ──▶ SQLite / Postgres
-  ├── litellm.completion() ──▶ hosted LLM provider          (AI Assistant: litellm mode)
+  ├── httpx ──▶ Bedrock Runtime Converse API (bearer token)  (AI Assistant: bedrock mode)
   ├── subprocess `claude -p`                                 (AI Assistant: claude_cli mode)
   ├── subprocess `claude mcp ...`                             (Connectors page)
   ├── python-docx / reportlab ──▶ generated .docx / .pdf      (Templates, Documents, Quotes)
@@ -153,8 +153,8 @@ runs entirely client-side; only Save/AI-draft/PNG-export round-trip to the backe
    name/customer/cloud/description into a reviewable New Project form — or just create
    the project directly from a template.
 3. Pick a Template or Document, optionally ask the AI Assistant to draft a section
-   (routed through LiteLLM or the local Claude CLI, whichever Settings selects), add an
-   AI-drafted/hand-edited architecture diagram → export to Word or PDF.
+   (routed through AWS Bedrock or the local Claude CLI, whichever Settings selects), add
+   an AI-drafted/hand-edited architecture diagram → export to Word or PDF.
 4. Or: build a quote or cost estimate in the Service Catalog — add tiers/add-ons to the
    cart, optionally link a Project, generate a Word/PDF/branded-Proposal quote with a
    real computed total, or save a computed Cost Estimate document straight onto the
@@ -173,7 +173,7 @@ generation + package creation, Knowledge Base upload/download/delete, Settings (
 info + API key rotation, masked), Users (real invite issuing a login-capable account),
 role-based access control, Connectors (reflects and manages real Claude Code MCP
 servers), audit logging, AI Chat (real multi-turn conversation via the same
-LiteLLM/Claude CLI provider selected in Settings), architecture diagram generation
+Bedrock/Claude CLI provider selected in Settings), architecture diagram generation
 (AI-drafted via draw.io embed, hand-editable, embeds as a real image in Word/PDF
 exports, with insert-under-a-specific-heading support), Service Catalog quotes linked
 back to a Project (from anywhere, not just the project page), a Cost Estimator that

@@ -3,7 +3,7 @@
 This app is two processes talking over HTTP:
 
 - **Frontend** — Next.js 15, built with `npm run build`, served with `npm start` (port 3000). It proxies `/api/*` to the backend server-side (`next.config.mjs`), so the browser only ever talks to the frontend's origin.
-- **Backend** — FastAPI + Uvicorn (port 8000). Talks to Postgres (or SQLite — see below), optionally to LiteLLM (hosted LLM) or a local `claude` CLI subprocess, and writes uploaded files to local disk (`backend/uploads/`).
+- **Backend** — FastAPI + Uvicorn (port 8000). Talks to Postgres (or SQLite — see below), optionally to AWS Bedrock (a direct HTTPS call, no boto3) or a local `claude` CLI subprocess, and writes uploaded files to local disk (`backend/uploads/`).
 
 For a low-traffic internal tool, the standard "production" AWS shape (ALB + RDS + NAT Gateway) is overkill and is usually the majority of the bill — an ALB alone runs ~$16-20/month before any traffic, a NAT Gateway ~$32+/month, RDS `db.t3.micro` ~$12-15/month. None of those are required to run this app safely for a handful of internal users. Prices below are rough/list-price ballparks (check the [AWS Pricing Calculator](https://calculator.aws) for your exact region) — the point is the shape, not the exact numbers.
 
@@ -42,8 +42,8 @@ These are the right tradeoffs for "minimize billing" — just going in with eyes
 
 ## Before you deploy: decide on the AI provider
 
-- **LiteLLM mode** (hosted LLM + API key) works anywhere. Use this for AWS.
-- **Claude CLI mode** shells out to a local `claude` binary using *your* logged-in session on *this* machine. It won't work on a fresh EC2 instance without repeating that login manually, and there's no cost benefit to it over LiteLLM (you still pay per-token via whatever plan is behind that login) — so for a cost-minimal deploy, just use LiteLLM with a `gpt-4o-mini`-class model, which is inexpensive per-request for occasional internal use.
+- **AWS Bedrock mode** — a direct HTTPS call to the Bedrock Runtime Converse API using an AWS Bedrock API key (a bearer token you generate from the Bedrock console's API keys page, not an Access Key ID/Secret Access Key pair, and no boto3 needed). Works anywhere. Use this for AWS.
+- **Claude CLI mode** shells out to a local `claude` binary using *your* logged-in session on *this* machine. It won't work on a fresh EC2 instance without repeating that login manually, and there's no cost benefit to it over Bedrock (you still pay per-token via whatever plan is behind that login) — so for a cost-minimal deploy, just use Bedrock with a Haiku/Sonnet-class model, which is inexpensive per-request for occasional internal use.
 
 ## Step by step
 
@@ -143,7 +143,7 @@ way: this is a manual step you have to actually set up — it does not happen by
 | `JWT_SECRET` | A fresh random secret for this environment: `python -c "import secrets; print(secrets.token_hex(32))"` |
 | `ADMIN_USERNAME` / `ADMIN_PASSWORD` | Only used once by `python -m app.seed` to create the first Owner account — rotate the password after first login |
 | `CORS_ORIGIN` | Your real domain, e.g. `https://sagen.yourcompany.com` |
-| `LITELLM_MODEL` + provider key | See "AI provider" section above |
+| AWS Bedrock API key, region, model | Entered in Settings → AI Provider, not backend/.env — see "AI provider" section above |
 | `CLAUDE_CLI_PATH` | Leave unset in production |
 
 For the frontend, set `BACKEND_URL=http://127.0.0.1:8000` (same instance).
@@ -237,7 +237,7 @@ Signs you've genuinely outgrown the single-instance shape: real concurrent load 
 - [ ] `curl https://sagen.yourcompany.com/api/health` returns `{"status":"ok"}`
 - [ ] `CORS_ORIGIN` matches the real domain (verify by logging in from a browser, not just curl)
 - [ ] `JWT_SECRET` is a fresh value, not copied from a dev `.env`
-- [ ] AI provider set to LiteLLM in Settings, with a working API key
+- [ ] AI provider set to AWS Bedrock in Settings, with a working API key (use Test Connection to confirm)
 - [ ] Default admin password rotated
 - [ ] A manual or cron-scheduled backup of the database (SQLite file or Postgres
       `pg_dump`) **and** `backend/uploads/` actually exists somewhere off the instance —

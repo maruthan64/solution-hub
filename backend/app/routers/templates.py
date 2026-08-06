@@ -11,7 +11,8 @@ from app.auth import require_role, require_user
 from app.database import get_db
 from app.document_export import markdown_to_docx, markdown_to_pdf
 from app.document_extract import extract_text
-from app.models import AppSettings, DocTemplate, User
+from app.models import DocTemplate, User
+from app.routers.settings import get_ai_config
 from app.schemas import TemplateAssistRequest, TemplateAssistResponse, TemplateOut, TemplateSource, TemplateUpdate
 
 router = APIRouter(prefix="/api/templates", tags=["templates"])
@@ -138,10 +139,9 @@ def assist_template(
     t = db.get(DocTemplate, template_id)
     if not t:
         raise HTTPException(status_code=404, detail="Template not found")
-    settings = db.get(AppSettings, "singleton")
-    provider = settings.ai_provider if settings else "litellm"
+    config = get_ai_config(db)
     try:
-        suggestion = draft_content(t.content, payload.instruction, provider)
+        suggestion = draft_content(t.content, payload.instruction, config)
     except RuntimeError as exc:
         raise HTTPException(status_code=502, detail=f"AI request failed: {exc}") from exc
     return TemplateAssistResponse(suggestion=suggestion)

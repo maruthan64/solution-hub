@@ -1,11 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Alert, Button, Card, Divider, Form, Input, Select, Space, Spin, Typography, message } from "antd";
+import { Alert, Button, Form, Input, Select, Spin, Typography, message } from "antd";
+import { CheckCircleOutlined, RobotOutlined, SettingOutlined } from "@ant-design/icons";
 import {
   AiProvider,
   getSettings,
-  rotateApiKey,
+  testAiConnection,
   updateBedrockCredentials,
   updateOrgSettings,
   updateSettings,
@@ -16,11 +17,6 @@ const { Title, Text } = Typography;
 
 const AI_PROVIDER_OPTIONS: { value: AiProvider; label: string; hint: string }[] = [
   {
-    value: "litellm",
-    label: "LiteLLM (API key or Ollama)",
-    hint: "Calls litellm.completion() using LITELLM_MODEL + a provider API key from backend/.env (or a local Ollama model — no key needed).",
-  },
-  {
     value: "claude_cli",
     label: "Claude CLI (local subprocess)",
     hint: "Shells out to `claude -p` on the machine running the backend, using your existing Claude Code login instead of API billing. Requires the claude CLI installed and logged in there.",
@@ -28,7 +24,7 @@ const AI_PROVIDER_OPTIONS: { value: AiProvider; label: string; hint: string }[] 
   {
     value: "bedrock",
     label: "AWS Bedrock",
-    hint: 'Calls litellm.completion() with a bedrock/ model. Enter credentials directly below, or leave them blank to fall back to the backend\'s own environment — an IAM role attached to the EC2 instance is the more secure option if you\'re running there.',
+    hint: "Calls the Bedrock Runtime Converse API directly over HTTPS using an AWS Bedrock API key — a bearer token, not an Access Key ID/Secret Access Key pair. Generate one from the AWS Bedrock console under API keys.",
   },
 ];
 
@@ -42,22 +38,53 @@ const BEDROCK_REGION_OPTIONS = [
   "eu-central-1",
 ].map((r) => ({ value: r, label: r }));
 
+type Category = "general" | "ai-provider";
+
+function Row({
+  label,
+  description,
+  children,
+}: {
+  label: string;
+  description?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="flex items-center justify-between gap-6 py-4 px-1">
+      <div className="min-w-0">
+        <div className="text-sm font-medium text-gray-900">{label}</div>
+        {description && <div className="text-xs text-gray-400 mt-0.5">{description}</div>}
+      </div>
+      <div className="shrink-0">{children}</div>
+    </div>
+  );
+}
+
+function Panel({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="settings-panel rounded-2xl border border-gray-200 bg-white px-4 divide-y divide-gray-100">
+      {children}
+    </div>
+  );
+}
+
 export default function SettingsPage() {
   const { data: settings, loading, refetch } = useApi(getSettings);
-  const [aiProvider, setAiProvider] = useState<AiProvider>("litellm");
+  const [category, setCategory] = useState<Category>("general");
+
+  const [aiProvider, setAiProvider] = useState<AiProvider>("claude_cli");
   const [savingProvider, setSavingProvider] = useState(false);
 
   const [orgForm] = Form.useForm();
   const [savingOrg, setSavingOrg] = useState(false);
 
-  const [apiKey, setApiKey] = useState("");
-  const [rotating, setRotating] = useState(false);
-
-  const [bedrockAccessKeyId, setBedrockAccessKeyId] = useState("");
-  const [bedrockSecretAccessKey, setBedrockSecretAccessKey] = useState("");
+  const [bedrockApiKey, setBedrockApiKey] = useState("");
   const [bedrockRegion, setBedrockRegion] = useState("");
   const [bedrockModel, setBedrockModel] = useState("");
   const [savingBedrock, setSavingBedrock] = useState(false);
+
+  const [testing, setTesting] = useState(false);
+  const [testResult, setTestResult] = useState<{ ok: boolean; message: string } | null>(null);
 
   const [messageApi, contextHolder] = message.useMessage();
 
@@ -76,6 +103,7 @@ export default function SettingsPage() {
 
   const handleSaveProvider = async () => {
     setSavingProvider(true);
+    setTestResult(null);
     try {
       await updateSettings(aiProvider);
       messageApi.success("AI Assistant provider updated.");
@@ -84,6 +112,19 @@ export default function SettingsPage() {
       messageApi.error("Failed to update AI Assistant provider.");
     } finally {
       setSavingProvider(false);
+    }
+  };
+
+  const handleTestConnection = async () => {
+    setTesting(true);
+    setTestResult(null);
+    try {
+      const res = await testAiConnection(aiProvider);
+      setTestResult({ ok: true, message: `Connected — the model replied "${res.reply}".` });
+    } catch (err) {
+      setTestResult({ ok: false, message: err instanceof Error ? err.message : "Connection test failed." });
+    } finally {
+      setTesting(false);
     }
   };
 
@@ -101,32 +142,16 @@ export default function SettingsPage() {
     }
   };
 
-  const handleRotateKey = async () => {
-    if (!apiKey.trim()) return;
-    setRotating(true);
-    try {
-      await rotateApiKey(apiKey.trim());
-      setApiKey("");
-      messageApi.success("LiteLLM proxy key updated.");
-      refetch();
-    } catch (err) {
-      messageApi.error(err instanceof Error ? err.message : "Failed to rotate key.");
-    } finally {
-      setRotating(false);
-    }
-  };
-
   const handleSaveBedrock = async () => {
     setSavingBedrock(true);
+    setTestResult(null);
     try {
       await updateBedrockCredentials({
-        accessKeyId: bedrockAccessKeyId.trim() || undefined,
-        secretAccessKey: bedrockSecretAccessKey.trim() || undefined,
+        apiKey: bedrockApiKey.trim() || undefined,
         region: bedrockRegion.trim(),
         model: bedrockModel.trim(),
       });
-      setBedrockAccessKeyId("");
-      setBedrockSecretAccessKey("");
+      setBedrockApiKey("");
       messageApi.success("AWS Bedrock credentials saved.");
       refetch();
     } catch (err) {
@@ -138,173 +163,206 @@ export default function SettingsPage() {
 
   const isProviderDirty = settings && aiProvider !== settings.aiProvider;
 
+  const categories: { key: Category; label: string; icon: React.ReactNode }[] = [
+    { key: "general", label: "General", icon: <SettingOutlined /> },
+    { key: "ai-provider", label: "AI Provider", icon: <RobotOutlined /> },
+  ];
+
+  if (loading || !settings) {
+    return (
+      <div className="flex justify-center py-20">
+        <Spin size="large" />
+      </div>
+    );
+  }
+
   return (
-    <div className="flex flex-col gap-4" style={{ maxWidth: 640 }}>
+    <div className="flex flex-col gap-4">
       {contextHolder}
       <div>
         <Title level={3} style={{ marginBottom: 0 }}>
           Settings
         </Title>
-        <Text type="secondary">Organization details, branding, and export defaults.</Text>
+        <Text type="secondary">Organization details, branding, AI provider, and export defaults.</Text>
       </div>
 
-      <Card title="AI Assistant">
-        <Text type="secondary" className="text-sm">
-          Which provider the template editor&apos;s &quot;Ask AI&quot; feature uses.
-        </Text>
-        <Divider style={{ margin: "12px 0" }} />
-        {loading || !settings ? (
-          <Spin />
-        ) : (
-          <>
-            <Select
-              size="large"
-              value={aiProvider}
-              onChange={setAiProvider}
-              style={{ width: "100%" }}
-              options={AI_PROVIDER_OPTIONS.map((o) => ({ value: o.value, label: o.label }))}
-            />
-            <Alert
-              className="mt-3"
-              type="info"
-              showIcon
-              message={AI_PROVIDER_OPTIONS.find((o) => o.value === aiProvider)?.hint}
-            />
-            <Button
-              type="primary"
-              className="mt-3"
-              disabled={!isProviderDirty}
-              loading={savingProvider}
-              onClick={handleSaveProvider}
+      <div className="flex gap-6" style={{ maxWidth: 880 }}>
+        <div className="w-[190px] shrink-0 flex flex-col gap-1">
+          {categories.map((c) => (
+            <button
+              key={c.key}
+              onClick={() => setCategory(c.key)}
+              className={`flex items-center gap-2.5 text-sm rounded-lg px-3 py-2 text-left transition-colors ${
+                category === c.key ? "bg-gray-100 font-medium text-gray-900" : "text-gray-500 hover:bg-gray-50"
+              }`}
             >
-              Save Changes
-            </Button>
-          </>
-        )}
-      </Card>
+              {c.icon} {c.label}
+            </button>
+          ))}
+        </div>
 
-      <Card title="Organization">
-        {loading || !settings ? (
-          <Spin />
-        ) : (
-          <Form form={orgForm} layout="vertical" requiredMark={false}>
-            <Form.Item label="Organization Name" name="orgName" rules={[{ required: true, message: "Required" }]}>
-              <Input size="large" />
-            </Form.Item>
-            <Form.Item label="Default Cloud Provider" name="defaultCloud">
-              <Select
-                size="large"
-                options={["AWS", "Azure", "GCP", "Multi-Cloud"].map((v) => ({ label: v, value: v }))}
-              />
-            </Form.Item>
-            <Form.Item label="Default Export Format" name="defaultExportFormat">
-              <Select size="large" options={["DOCX", "PDF", "Markdown"].map((v) => ({ label: v, value: v }))} />
-            </Form.Item>
-            <Button type="primary" loading={savingOrg} onClick={handleSaveOrg}>
-              Save Changes
-            </Button>
-          </Form>
-        )}
-      </Card>
-
-      <Card title="API Keys">
-        <Text type="secondary" className="text-sm">
-          Used by the FastAPI backend to authenticate outbound calls through LiteLLM. Not used
-          by AWS Bedrock — see the card below for that.
-        </Text>
-        <Divider style={{ margin: "12px 0" }} />
-        {settings?.apiKeyPreview && (
-          <Text type="secondary" className="text-sm block mb-2">
-            Current key: <Text code>{settings.apiKeyPreview}</Text>
-          </Text>
-        )}
-        <Form layout="vertical" requiredMark={false}>
-          <Form.Item label="LiteLLM Proxy Key">
-            <Input.Password
-              placeholder="sk-litellm-..."
-              size="large"
-              value={apiKey}
-              onChange={(e) => setApiKey(e.target.value)}
-            />
-          </Form.Item>
-          <Button loading={rotating} disabled={!apiKey.trim()} onClick={handleRotateKey}>
-            Rotate Key
-          </Button>
-        </Form>
-      </Card>
-
-      {aiProvider === "bedrock" && (
-        <Card title="AWS Bedrock Credentials">
-          <Text type="secondary" className="text-sm">
-            AWS requires both an Access Key ID and a Secret Access Key together — they
-            cryptographically sign each request (AWS Signature V4), unlike a single bearer-token
-            API key. Leave either blank to keep it unchanged (or to fall back to the backend&apos;s
-            own environment / IAM role instead of a stored key).
-          </Text>
-          <Divider style={{ margin: "12px 0" }} />
-          {loading || !settings ? (
-            <Spin />
-          ) : (
+        <div className="flex-1 min-w-0 flex flex-col gap-3">
+          {category === "general" && (
             <>
-              {(settings.bedrockAccessKeyIdPreview || settings.bedrockSecretKeySet) && (
-                <Space direction="vertical" size={0} className="mb-2">
-                  {settings.bedrockAccessKeyIdPreview && (
-                    <Text type="secondary" className="text-sm">
-                      Current Access Key ID: <Text code>{settings.bedrockAccessKeyIdPreview}</Text>
-                    </Text>
-                  )}
-                  <Text type="secondary" className="text-sm">
-                    Secret Access Key: {settings.bedrockSecretKeySet ? "set" : "not set"}
-                  </Text>
-                </Space>
-              )}
-              <Form layout="vertical" requiredMark={false}>
-                <Form.Item label="Access Key ID">
-                  <Input.Password
-                    placeholder="AKIA..."
-                    size="large"
-                    value={bedrockAccessKeyId}
-                    onChange={(e) => setBedrockAccessKeyId(e.target.value)}
-                  />
-                </Form.Item>
-                <Form.Item label="Secret Access Key">
-                  <Input.Password
-                    placeholder="Leave blank to keep the current one"
-                    size="large"
-                    value={bedrockSecretAccessKey}
-                    onChange={(e) => setBedrockSecretAccessKey(e.target.value)}
-                  />
-                </Form.Item>
-                <Form.Item label="Region">
-                  <Select
-                    size="large"
-                    placeholder="Select a region"
-                    value={bedrockRegion || undefined}
-                    onChange={setBedrockRegion}
-                    options={BEDROCK_REGION_OPTIONS}
-                    allowClear
-                    showSearch
-                  />
-                </Form.Item>
-                <Form.Item
-                  label="Model"
-                  help='e.g. "bedrock/anthropic.claude-3-5-sonnet-20241022-v2:0" — see the AWS Bedrock console for available model IDs in your region.'
-                >
-                  <Input
-                    placeholder="bedrock/anthropic.claude-3-5-sonnet-..."
-                    size="large"
-                    value={bedrockModel}
-                    onChange={(e) => setBedrockModel(e.target.value)}
-                  />
-                </Form.Item>
-                <Button type="primary" loading={savingBedrock} onClick={handleSaveBedrock}>
-                  Save Bedrock Credentials
-                </Button>
+              <Text type="secondary" className="text-xs uppercase tracking-wide font-semibold">
+                Organization
+              </Text>
+              <Form form={orgForm} component={false}>
+                <Panel>
+                  <Row label="Organization Name">
+                    <Form.Item name="orgName" noStyle rules={[{ required: true, message: "Required" }]}>
+                      <Input className="settings-pill" style={{ width: 220 }} />
+                    </Form.Item>
+                  </Row>
+                  <Row label="Default Cloud Provider">
+                    <Form.Item name="defaultCloud" noStyle>
+                      <Select
+                        className="settings-pill"
+                        style={{ width: 160 }}
+                        options={["AWS", "Azure", "GCP", "Multi-Cloud"].map((v) => ({ label: v, value: v }))}
+                      />
+                    </Form.Item>
+                  </Row>
+                  <Row label="Default Export Format">
+                    <Form.Item name="defaultExportFormat" noStyle>
+                      <Select
+                        className="settings-pill"
+                        style={{ width: 160 }}
+                        options={["DOCX", "PDF", "Markdown"].map((v) => ({ label: v, value: v }))}
+                      />
+                    </Form.Item>
+                  </Row>
+                </Panel>
               </Form>
+              <Button type="primary" loading={savingOrg} onClick={handleSaveOrg} className="self-start">
+                Save Changes
+              </Button>
             </>
           )}
-        </Card>
-      )}
+
+          {category === "ai-provider" && (
+            <>
+              <Text type="secondary" className="text-xs uppercase tracking-wide font-semibold">
+                AI Assistant
+              </Text>
+              <Text type="secondary" className="text-sm -mt-2">
+                Which provider the template editor&apos;s &quot;Ask AI&quot; feature uses.
+              </Text>
+              <Panel>
+                <Row label="Provider">
+                  <Select
+                    className="settings-pill"
+                    style={{ width: 260 }}
+                    value={aiProvider}
+                    onChange={(v) => {
+                      setAiProvider(v);
+                      setTestResult(null);
+                    }}
+                    options={AI_PROVIDER_OPTIONS.map((o) => ({ value: o.value, label: o.label }))}
+                  />
+                </Row>
+              </Panel>
+              <Alert
+                type="info"
+                showIcon
+                message={AI_PROVIDER_OPTIONS.find((o) => o.value === aiProvider)?.hint}
+              />
+              <Button
+                type="primary"
+                disabled={!isProviderDirty}
+                loading={savingProvider}
+                onClick={handleSaveProvider}
+                className="self-start"
+              >
+                Save Changes
+              </Button>
+
+              {aiProvider === "claude_cli" && (
+                <Alert
+                  className="mt-1"
+                  type="info"
+                  showIcon
+                  message="No key needed here — this uses the `claude` CLI already installed and logged in on the machine running the backend."
+                />
+              )}
+
+              {aiProvider === "bedrock" && (
+                <>
+                  <Text type="secondary" className="text-xs uppercase tracking-wide font-semibold mt-3">
+                    AWS Bedrock Credentials
+                  </Text>
+                  <Text type="secondary" className="text-sm -mt-2">
+                    A Bedrock API key is a single bearer token — generate one from the AWS Bedrock console under
+                    API keys. Leave it blank to keep the currently saved one.
+                  </Text>
+                  <Panel>
+                    <Row label="API Key" description={settings.bedrockApiKeyPreview ?? "Not set"}>
+                      <Input.Password
+                        className="settings-pill"
+                        placeholder="Leave blank to keep current"
+                        style={{ width: 200 }}
+                        value={bedrockApiKey}
+                        onChange={(e) => setBedrockApiKey(e.target.value)}
+                      />
+                    </Row>
+                    <Row label="Region">
+                      <Select
+                        className="settings-pill"
+                        style={{ width: 200 }}
+                        placeholder="Select a region"
+                        value={bedrockRegion || undefined}
+                        onChange={setBedrockRegion}
+                        options={BEDROCK_REGION_OPTIONS}
+                        allowClear
+                        showSearch
+                      />
+                    </Row>
+                    <Row
+                      label="Model"
+                      description='us-east-1: "anthropic.claude-3-5-sonnet-20241022-v2:0". Most other regions need a cross-region inference profile instead, e.g. ap-south-1 → "apac.anthropic.claude-3-5-sonnet-20241022-v2:0".'
+                    >
+                      <Input
+                        className="settings-pill"
+                        placeholder="anthropic.claude-3-5-sonnet-... or apac.anthropic...."
+                        style={{ width: 200 }}
+                        value={bedrockModel}
+                        onChange={(e) => setBedrockModel(e.target.value)}
+                      />
+                    </Row>
+                  </Panel>
+                  <Button type="primary" loading={savingBedrock} onClick={handleSaveBedrock} className="self-start">
+                    Save Bedrock Credentials
+                  </Button>
+                </>
+              )}
+
+              <div className="flex items-center gap-3 mt-3">
+                <Button icon={<CheckCircleOutlined />} loading={testing} onClick={handleTestConnection}>
+                  Test Connection
+                </Button>
+                <Text type="secondary" className="text-xs">
+                  Makes one real request through the saved credentials above.
+                </Text>
+              </div>
+              {testResult && (
+                <Alert type={testResult.ok ? "success" : "error"} showIcon message={testResult.message} />
+              )}
+            </>
+          )}
+        </div>
+      </div>
+
+      <style jsx global>{`
+        .settings-panel .ant-select-selector,
+        .settings-panel .ant-input,
+        .settings-panel .ant-input-affix-wrapper {
+          border-radius: 999px !important;
+        }
+        .settings-pill.ant-input,
+        .settings-pill .ant-input {
+          border-radius: 999px;
+        }
+      `}</style>
     </div>
   );
 }

@@ -10,7 +10,8 @@ from app.audit import log_action
 from app.auth import require_role, require_user
 from app.database import get_db
 from app.document_export import markdown_to_docx, markdown_to_pdf
-from app.models import AppSettings, DocumentDiagram, GeneratedDocument, User
+from app.models import DocumentDiagram, GeneratedDocument, User
+from app.routers.settings import get_ai_config
 from app.schemas import DocumentOut, ReviewNoteRequest, TemplateAssistRequest, TemplateAssistResponse, TemplateUpdate
 
 router = APIRouter(prefix="/api/documents", tags=["documents"])
@@ -149,10 +150,9 @@ def assist_document(
     doc = db.get(GeneratedDocument, document_id)
     if not doc:
         raise HTTPException(status_code=404, detail="Document not found")
-    settings = db.get(AppSettings, "singleton")
-    provider = settings.ai_provider if settings else "litellm"
+    config = get_ai_config(db)
     try:
-        suggestion = draft_content(doc.content, payload.instruction, provider)
+        suggestion = draft_content(doc.content, payload.instruction, config)
     except RuntimeError as exc:
         raise HTTPException(status_code=502, detail=f"AI request failed: {exc}") from exc
     return TemplateAssistResponse(suggestion=suggestion)

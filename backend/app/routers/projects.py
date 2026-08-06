@@ -10,7 +10,8 @@ from app.audit import log_action
 from app.auth import require_role, require_user
 from app.database import get_db
 from app.document_export import build_cost_estimate_markdown
-from app.models import AppSettings, Capability, DocTemplate, GeneratedDocument, Project, Quote, ServicePackage, User
+from app.models import Capability, DocTemplate, GeneratedDocument, Project, Quote, ServicePackage, User
+from app.routers.settings import get_ai_config
 from app.schemas import CostEstimateRequest, DocumentOut, ProjectOut, QuoteOut
 
 router = APIRouter(prefix="/api/projects", tags=["projects"])
@@ -198,10 +199,9 @@ def create_project(
         if description:
             instruction += f" Project description: {description}"
 
-        settings = db.get(AppSettings, "singleton")
-        provider = settings.ai_provider if settings else "litellm"
+        config = get_ai_config(db)
         try:
-            generated_content = draft_content(template.content, instruction, provider)
+            generated_content = draft_content(template.content, instruction, config)
         except RuntimeError as exc:
             raise HTTPException(
                 status_code=502,

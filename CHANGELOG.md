@@ -7,6 +7,30 @@ through commit history.
 
 ## Unreleased
 
+## 2026-08-06 — Removed LiteLLM/boto3; AWS Bedrock now calls the API directly
+
+- **Dropped `litellm` and `boto3` as dependencies entirely.** Bedrock was previously
+  reached through `litellm.completion(model="bedrock/...")`, which required `boto3` and
+  AWS SigV4 request signing (an Access Key ID + Secret Access Key pair) — and `boto3`
+  turned out to not even be installed, so every Bedrock call was failing with
+  `ImportError: Missing boto3 to call bedrock`. AWS now offers **Bedrock API keys** (a
+  bearer token, generated from the Bedrock console), which the Bedrock Runtime Converse
+  API accepts directly over plain HTTPS — no SDK, no signing. `ai_assist.py` now calls it
+  with a plain `httpx.post(...)` and an `Authorization: Bearer <key>` header.
+  - Settings → AI Provider now offers **Claude CLI** or **AWS Bedrock** only — the
+    "LiteLLM (API key or Ollama)" option is gone. Its underlying `litellm_proxy_key`
+    field was never actually wired to anything real anyway (a bug fixed and then made
+    moot in the same day — see below).
+  - Bedrock credentials in Settings are now a single **API Key** field instead of
+    separate Access Key ID + Secret Access Key fields.
+  - `AppSettings.bedrock_access_key_id` / `bedrock_secret_access_key` / `litellm_proxy_key`
+    columns are gone, replaced by a single `bedrock_api_key` column — existing rows need
+    a fresh `drop_all`/`create_all` (or equivalent migration) to pick up the new schema.
+- Every AI-calling router (`chat`, `diagrams`, `documents`, `projects`, `templates`) now
+  builds an `AiConfig` (via a shared `get_ai_config(db)` helper in `routers/settings.py`)
+  instead of passing a bare `provider` string — Bedrock's API key/region/model travel
+  with it, since there's no longer an env var for `ai_assist.py` to read them from.
+
 ## 2026-08-05 — First live deployment; Capability.id column-width fix
 
 - **Deployed to AWS**: CloudSolution Hub is now running on the EC2 instance provisioned

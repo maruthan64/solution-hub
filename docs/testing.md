@@ -56,21 +56,20 @@ by the specific IDs/names your test created instead.
 
 ### Mocking AI calls — never hits a real provider
 
-Every test that exercises `ai_assist.py` logic (diagram XML generation, chat-to-project
-extraction) monkeypatches `litellm.completion` rather than calling out to a real LLM:
+`ai_assist.py` has two provider paths — Bedrock (a direct HTTPS call via `httpx.post`) and
+Claude CLI (a `subprocess.run` call) — and tests never let either touch the real world.
+For Bedrock-path tests, patch the shared `_bedrock_converse` helper so nothing below it
+(not even `httpx`) gets exercised:
 
 ```python
-def _fake_completion(content: str):
-    def _fn(*args, **kwargs):
-        return {"choices": [{"message": {"content": content}}]}
-    return _fn
-
-monkeypatch.setattr(ai_assist.litellm, "completion", _fake_completion(json.dumps(payload)))
+monkeypatch.setattr(ai_assist, "_bedrock_converse", lambda config, system, messages: json.dumps(payload))
 ```
 
-This works because `ai_assist.py` does `import litellm` (module import) and calls
-`litellm.completion(...)` — patching the `completion` attribute on the shared `litellm`
-module object affects every caller.
+For Claude CLI-path tests, patch `subprocess.run` and `resolve_claude_binary` instead —
+see `TestClaudeCliDispatch` in `test_ai_assist.py`. `TestBedrockConverse` in the same file
+goes one level deeper and mocks `ai_assist.httpx.post` itself, to verify the actual request
+shape (bearer token in the `Authorization` header, model ID in the URL, etc.) without a
+real network call.
 
 **Gotcha this codebase has already hit once:** if you're testing a *router* that calls an
 `ai_assist.py` function via `from app.ai_assist import some_function`, patching
@@ -79,12 +78,11 @@ router module's own namespace at import time. Patch it where it's *used*:
 
 ```python
 from app.routers import chat as chat_router
-monkeypatch.setattr(chat_router, "extract_project_from_chat", lambda messages, provider: extracted)
+monkeypatch.setattr(chat_router, "extract_project_from_chat", lambda messages, config: extracted)
 ```
 
-`test_api_smoke.py::TestChatExtractProject` and `test_ai_assist.py` both demonstrate this
-— the former patches the router's imported name, the latter patches `litellm.completion`
-directly since it's calling `ai_assist` functions straight, not through a router.
+`test_api_smoke.py::TestChatExtractProject` demonstrates this — it patches the router's
+imported name rather than `ai_assist.extract_project_from_chat` directly.
 
 ### What's covered, file by file
 
@@ -105,11 +103,13 @@ other via the module-level `_attempts` dict.
 - `build_cost_estimate_markdown` — total computed correctly across multiple packages,
   resource table rows render, empty package list produces a `$0.00/mo` total
 
-**`test_ai_assist.py`** — `extract_project_from_chat` and `draft_diagram_xml`, both with
-mocked `litellm.completion`: valid JSON/XML parses through correctly, markdown code
-fences around the response get stripped, missing JSON fields fall back to empty strings
-rather than crashing, and invalid JSON/XML raises `RuntimeError` (which routers turn into
-a 502).
+**`test_ai_assist.py`** — `TestBedrockConverse` covers the direct-HTTP Bedrock path itself
+(bearer token header, model-in-URL, missing-key and non-200-response error messages).
+`extract_project_from_chat` and `draft_diagram_xml` are tested with `_bedrock_converse`
+mocked: valid JSON/XML parses through correctly, markdown code fences around the response
+get stripped, missing JSON fields fall back to empty strings rather than crashing, and
+invalid JSON/XML raises `RuntimeError` (which routers turn into a 502).
+`TestClaudeCliDispatch` confirms the default provider never touches the network.
 
 **`test_api_smoke.py`** — integration tests via `TestClient`, organized by concern:
 - `TestHealth` / `TestAuthRequired` — `/api/health` needs no auth, `/api/projects` and
@@ -163,9 +163,9 @@ workflow itself doesn't enforce that, GitHub repo settings do).
 `test_*.py` file (e.g. a new `document_export.py` function goes in
 `test_document_export.py`). New router/endpoint → add to `test_api_smoke.py`, using
 `auth_client` unless you're specifically testing an unauthenticated or role-restricted
-path. If it touches `ai_assist.py`, mock `litellm.completion` (or the imported name in
-whichever router calls it) — never let a test make a real network call to an LLM
-provider.
+path. If it touches `ai_assist.py`, mock `_bedrock_converse` (Bedrock path) or
+`subprocess.run` (Claude CLI path) — or the imported name in whichever router calls it —
+never let a test make a real network call to an LLM provider.
 
 **Frontend**: co-locate `*.test.ts` next to the file it tests (matches `lib/api.test.ts`
 sitting next to `lib/api.ts`). Mock `global.fetch` with `vi.stubGlobal`/`vi.fn()` rather

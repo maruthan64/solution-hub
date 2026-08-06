@@ -1,19 +1,89 @@
 import json
-import os
 import subprocess
 import xml.etree.ElementTree as ET
+from dataclasses import dataclass
 
-import litellm
+import httpx
 
 from app.claude_cli import resolve_claude_binary
 
+DEFAULT_BEDROCK_MODEL = "anthropic.claude-3-5-sonnet-20241022-v2:0"
+DEFAULT_BEDROCK_REGION = "us-east-1"
 
-def _resolve_model(provider: str) -> str:
-    """Bedrock is just another litellm.completion() model string (a bedrock/... one) with its
-    own env var, so it shares every _via_litellm function below rather than duplicating them."""
-    if provider == "bedrock":
-        return os.getenv("BEDROCK_MODEL", "bedrock/anthropic.claude-3-haiku-20240307-v1:0")
-    return os.getenv("LITELLM_MODEL", "gpt-4o-mini")
+
+@dataclass
+class AiConfig:
+    """Which AI provider to use and, for Bedrock, the credentials to use it with.
+    Built fresh from the AppSettings row on every call rather than cached in env vars —
+    there's nothing left to bridge into the process environment now that Bedrock is a
+    plain HTTPS call, not something boto3/litellm reads out of os.environ."""
+
+    provider: str = "claude_cli"
+    bedrock_api_key: str | None = None
+    bedrock_region: str | None = None
+    bedrock_model: str | None = None
+
+    @classmethod
+    def from_settings(cls, settings) -> "AiConfig":
+        if settings is None:
+            return cls()
+        return cls(
+            provider=settings.ai_provider,
+            bedrock_api_key=settings.bedrock_api_key,
+            bedrock_region=settings.bedrock_region,
+            bedrock_model=settings.bedrock_model,
+        )
+
+
+def _bedrock_converse(config: AiConfig, system_prompt: str | None, messages: list[dict[str, str]]) -> str:
+    """Calls the Bedrock Runtime Converse API directly over HTTPS using an AWS Bedrock API
+    key (a bearer token) — no boto3, no AWS SigV4 request signing, no Access Key ID/Secret
+    Access Key pair. See https://docs.aws.amazon.com/bedrock/latest/userguide/api-keys.html."""
+    if not config.bedrock_api_key:
+        raise RuntimeError("No AWS Bedrock API key configured. Add one in Settings → AI Provider → AWS Bedrock.")
+
+    region = config.bedrock_region or DEFAULT_BEDROCK_REGION
+    model = (config.bedrock_model or DEFAULT_BEDROCK_MODEL).removeprefix("bedrock/")
+    url = f"https://bedrock-runtime.{region}.amazonaws.com/model/{model}/converse"
+
+    body: dict = {
+        "messages": [
+            {
+                "role": m["role"] if m["role"] in ("user", "assistant") else "user",
+                "content": [{"text": m["content"]}],
+            }
+            for m in messages
+        ]
+    }
+    if system_prompt:
+        body["system"] = [{"text": system_prompt}]
+
+    try:
+        response = httpx.post(
+            url,
+            headers={"Authorization": f"Bearer {config.bedrock_api_key}", "Content-Type": "application/json"},
+            json=body,
+            timeout=60,
+        )
+    except httpx.HTTPError as exc:
+        raise RuntimeError(f"Could not reach AWS Bedrock ({exc}). Check the region ('{region}').") from exc
+
+    if response.status_code != 200:
+        detail = response.text.strip()
+        try:
+            detail = response.json().get("message", detail)
+        except ValueError:
+            pass
+        raise RuntimeError(
+            f"AWS Bedrock returned {response.status_code}: {detail} — check the API key, region ('{region}'), "
+            f"and model id ('{model}') in Settings → AI Provider."
+        )
+
+    data = response.json()
+    try:
+        return data["output"]["message"]["content"][0]["text"]
+    except (KeyError, IndexError, TypeError) as exc:
+        raise RuntimeError(f"AWS Bedrock returned an unexpected response shape: {data}") from exc
 
 
 SYSTEM_PROMPT = (
@@ -27,28 +97,6 @@ SYSTEM_PROMPT = (
     "afterward. Return only the drafted content itself — no commentary, no preamble, no code "
     "fences around the whole response."
 )
-
-
-def _draft_via_litellm(current_content: str, instruction: str, provider: str = "litellm") -> str:
-    model = _resolve_model(provider)
-    try:
-        response = litellm.completion(
-            model=model,
-            messages=[
-                {"role": "system", "content": SYSTEM_PROMPT},
-                {
-                    "role": "user",
-                    "content": f"Current template content:\n\n{current_content}\n\n---\n\nInstruction: {instruction}",
-                },
-            ],
-        )
-    except Exception as exc:  # noqa: BLE001 - surface provider errors verbatim to the caller
-        raise RuntimeError(
-            f"{exc} — check the credentials for '{model}' in backend/.env (a provider API key for "
-            f"LiteLLM, or AWS credentials/an IAM role for Bedrock), or switch providers in Settings."
-        ) from exc
-
-    return response["choices"][0]["message"]["content"]
 
 
 def _draft_via_claude_cli(current_content: str, instruction: str) -> str:
@@ -78,10 +126,11 @@ def _draft_via_claude_cli(current_content: str, instruction: str) -> str:
     return result.stdout.strip()
 
 
-def draft_content(current_content: str, instruction: str, provider: str = "litellm") -> str:
-    if provider == "claude_cli":
-        return _draft_via_claude_cli(current_content, instruction)
-    return _draft_via_litellm(current_content, instruction, provider)
+def draft_content(current_content: str, instruction: str, config: AiConfig) -> str:
+    if config.provider == "bedrock":
+        user_msg = f"Current template content:\n\n{current_content}\n\n---\n\nInstruction: {instruction}"
+        return _bedrock_converse(config, SYSTEM_PROMPT, [{"role": "user", "content": user_msg}])
+    return _draft_via_claude_cli(current_content, instruction)
 
 
 DIAGRAM_SYSTEM_PROMPT_TEMPLATE = (
@@ -130,25 +179,6 @@ def _diagram_system_prompt(cloud: str) -> str:
     return DIAGRAM_SYSTEM_PROMPT_TEMPLATE.format(cloud=cloud or "generic", stencil_hint=stencil_hint)
 
 
-def _draft_diagram_via_litellm(instruction: str, cloud: str, provider: str = "litellm") -> str:
-    model = _resolve_model(provider)
-    try:
-        response = litellm.completion(
-            model=model,
-            messages=[
-                {"role": "system", "content": _diagram_system_prompt(cloud)},
-                {"role": "user", "content": instruction},
-            ],
-        )
-    except Exception as exc:  # noqa: BLE001 - surface provider errors verbatim to the caller
-        raise RuntimeError(
-            f"{exc} — check the credentials for '{model}' in backend/.env (a provider API key for "
-            f"LiteLLM, or AWS credentials/an IAM role for Bedrock), or switch providers in Settings."
-        ) from exc
-
-    return response["choices"][0]["message"]["content"]
-
-
 def _draft_diagram_via_claude_cli(instruction: str, cloud: str) -> str:
     claude_bin = resolve_claude_binary()
     if claude_bin is None:
@@ -186,11 +216,11 @@ def _extract_xml(raw: str) -> str:
     return text.strip()
 
 
-def draft_diagram_xml(instruction: str, cloud: str, provider: str = "litellm") -> str:
+def draft_diagram_xml(instruction: str, cloud: str, config: AiConfig) -> str:
     raw = (
-        _draft_diagram_via_claude_cli(instruction, cloud)
-        if provider == "claude_cli"
-        else _draft_diagram_via_litellm(instruction, cloud, provider)
+        _bedrock_converse(config, _diagram_system_prompt(cloud), [{"role": "user", "content": instruction}])
+        if config.provider == "bedrock"
+        else _draft_diagram_via_claude_cli(instruction, cloud)
     )
 
     xml_text = _extract_xml(raw)
@@ -211,22 +241,6 @@ CHAT_SYSTEM_PROMPT = (
     "Once you have enough to describe the solution, say so plainly and suggest the architect start "
     "a project from it — you are not generating the actual documents in this chat."
 )
-
-
-def _chat_via_litellm(messages: list[dict[str, str]], provider: str = "litellm") -> str:
-    model = _resolve_model(provider)
-    try:
-        response = litellm.completion(
-            model=model,
-            messages=[{"role": "system", "content": CHAT_SYSTEM_PROMPT}, *messages],
-        )
-    except Exception as exc:  # noqa: BLE001 - surface provider errors verbatim to the caller
-        raise RuntimeError(
-            f"{exc} — check the credentials for '{model}' in backend/.env (a provider API key for "
-            f"LiteLLM, or AWS credentials/an IAM role for Bedrock), or switch providers in Settings."
-        ) from exc
-
-    return response["choices"][0]["message"]["content"]
 
 
 def _chat_via_claude_cli(messages: list[dict[str, str]]) -> str:
@@ -257,10 +271,21 @@ def _chat_via_claude_cli(messages: list[dict[str, str]]) -> str:
     return result.stdout.strip()
 
 
-def chat_reply(messages: list[dict[str, str]], provider: str = "litellm") -> str:
-    if provider == "claude_cli":
-        return _chat_via_claude_cli(messages)
-    return _chat_via_litellm(messages, provider)
+def chat_reply(messages: list[dict[str, str]], config: AiConfig) -> str:
+    if config.provider == "bedrock":
+        return _bedrock_converse(config, CHAT_SYSTEM_PROMPT, messages)
+    return _chat_via_claude_cli(messages)
+
+
+def test_connection(config: AiConfig) -> str:
+    """Makes one minimal request through the configured provider and returns its reply.
+    Backs Settings' "Test Connection" button — saving credentials only confirms they were
+    written to the database, not that they actually authenticate, so this makes the one
+    real call needed to tell the two apart."""
+    probe = [{"role": "user", "content": "Reply with only the single word: OK"}]
+    if config.provider == "bedrock":
+        return _bedrock_converse(config, None, probe)
+    return _chat_via_claude_cli(probe)
 
 
 EXTRACT_PROJECT_SYSTEM_PROMPT = (
@@ -285,22 +310,6 @@ def _extract_json(raw: str) -> str:
         if text.endswith("```"):
             text = text.rsplit("```", 1)[0]
     return text.strip()
-
-
-def _extract_project_via_litellm(messages: list[dict[str, str]], provider: str = "litellm") -> str:
-    model = _resolve_model(provider)
-    try:
-        response = litellm.completion(
-            model=model,
-            messages=[{"role": "system", "content": EXTRACT_PROJECT_SYSTEM_PROMPT}, *messages],
-        )
-    except Exception as exc:  # noqa: BLE001 - surface provider errors verbatim to the caller
-        raise RuntimeError(
-            f"{exc} — check the credentials for '{model}' in backend/.env (a provider API key for "
-            f"LiteLLM, or AWS credentials/an IAM role for Bedrock), or switch providers in Settings."
-        ) from exc
-
-    return response["choices"][0]["message"]["content"]
 
 
 def _extract_project_via_claude_cli(messages: list[dict[str, str]]) -> str:
@@ -331,11 +340,11 @@ def _extract_project_via_claude_cli(messages: list[dict[str, str]]) -> str:
     return result.stdout.strip()
 
 
-def extract_project_from_chat(messages: list[dict[str, str]], provider: str = "litellm") -> dict[str, str]:
+def extract_project_from_chat(messages: list[dict[str, str]], config: AiConfig) -> dict[str, str]:
     raw = (
-        _extract_project_via_claude_cli(messages)
-        if provider == "claude_cli"
-        else _extract_project_via_litellm(messages, provider)
+        _bedrock_converse(config, EXTRACT_PROJECT_SYSTEM_PROMPT, messages)
+        if config.provider == "bedrock"
+        else _extract_project_via_claude_cli(messages)
     )
 
     text = _extract_json(raw)

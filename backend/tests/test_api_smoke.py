@@ -2,6 +2,7 @@ import uuid
 
 from app.models import GeneratedDocument, Project
 from app.routers import chat as chat_router
+from app.routers import settings as settings_router
 
 
 class TestHealth:
@@ -247,3 +248,31 @@ class TestChatExtractProject:
             "/api/chat/extract-project", json={"messages": [{"role": "user", "content": "hi"}]}
         )
         assert resp.status_code == 502
+
+
+class TestSettingsTestConnection:
+    def test_success_returns_reply(self, auth_client, monkeypatch):
+        monkeypatch.setattr(settings_router, "run_connection_test", lambda provider: "OK")
+
+        resp = auth_client.post("/api/settings/test-connection", json={"provider": "claude_cli"})
+        assert resp.status_code == 200
+        assert resp.json() == {"ok": True, "reply": "OK"}
+
+    def test_provider_failure_returns_400_with_detail(self, auth_client, monkeypatch):
+        def _raise(provider):
+            raise RuntimeError("Invalid Access Key Id")
+
+        monkeypatch.setattr(settings_router, "run_connection_test", _raise)
+        resp = auth_client.post("/api/settings/test-connection", json={"provider": "bedrock"})
+        assert resp.status_code == 400
+        assert "Invalid Access Key Id" in resp.json()["detail"]
+
+    def test_rejects_unknown_provider(self, auth_client):
+        resp = auth_client.post("/api/settings/test-connection", json={"provider": "not-a-provider"})
+        assert resp.status_code == 400
+
+    def test_requires_owner_role(self, client, make_user):
+        user, password = make_user(role="Viewer")
+        client.post("/api/auth/login", json={"username": user.username, "password": password})
+        resp = client.post("/api/settings/test-connection", json={"provider": "claude_cli"})
+        assert resp.status_code == 403

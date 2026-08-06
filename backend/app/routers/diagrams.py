@@ -9,7 +9,8 @@ from app.ai_assist import draft_diagram_xml
 from app.audit import log_action
 from app.auth import require_role, require_user
 from app.database import get_db
-from app.models import AppSettings, DocumentDiagram, GeneratedDocument, Project, User
+from app.models import DocumentDiagram, GeneratedDocument, Project, User
+from app.routers.settings import get_ai_config
 from app.schemas import DiagramAssistResponse, DiagramOut, DiagramSaveRequest, TemplateAssistRequest
 
 router = APIRouter(prefix="/api/documents", tags=["diagrams"])
@@ -65,12 +66,11 @@ def assist_diagram(
     _user: str = Depends(require_user),
 ):
     doc = _get_document(db, document_id)
-    settings = db.get(AppSettings, "singleton")
-    provider = settings.ai_provider if settings else "litellm"
+    config = get_ai_config(db)
     project = db.query(Project).filter(Project.name == doc.project).first()
     cloud = project.cloud if project else "generic"
     try:
-        xml = draft_diagram_xml(payload.instruction, cloud, provider)
+        xml = draft_diagram_xml(payload.instruction, cloud, config)
     except RuntimeError as exc:
         raise HTTPException(status_code=502, detail=f"AI request failed: {exc}") from exc
     return DiagramAssistResponse(xml=xml)

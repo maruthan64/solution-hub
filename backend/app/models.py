@@ -104,16 +104,20 @@ class AppSettings(Base):
     __tablename__ = "app_settings"
 
     id: Mapped[str] = mapped_column(String(16), primary_key=True, default="singleton")
-    # "litellm" (API key or Ollama, via LITELLM_MODEL) or "claude_cli" (local `claude -p` subprocess)
-    ai_provider: Mapped[str] = mapped_column(String(32), default="litellm")
+    # "claude_cli" (local `claude -p` subprocess) or "bedrock" (direct HTTPS call to the
+    # Bedrock Runtime Converse API using an AWS Bedrock API key bearer token)
+    ai_provider: Mapped[str] = mapped_column(String(32), default="claude_cli")
     org_name: Mapped[str] = mapped_column(String(200), default="Solution Architecture Team")
     default_cloud: Mapped[str] = mapped_column(String(32), default="AWS")
     default_export_format: Mapped[str] = mapped_column(String(16), default="DOCX")
-    litellm_proxy_key: Mapped[str | None] = mapped_column(String(200), nullable=True)
-    # AWS Bedrock — entered directly in Settings rather than requiring backend/.env access;
-    # bridged into process env vars on save/startup since that's what litellm/boto3 read.
-    bedrock_access_key_id: Mapped[str | None] = mapped_column(String(200), nullable=True)
-    bedrock_secret_access_key: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    # AWS Bedrock API key (a bearer token, not an Access Key ID/Secret Access Key pair) —
+    # see https://docs.aws.amazon.com/bedrock/latest/userguide/api-keys.html. Entered
+    # directly in Settings; read fresh from this row on every AI call, nothing to bridge
+    # into process env vars since the call is a plain HTTPS request, not boto3/litellm.
+    # Text, not a bounded VARCHAR: real keys embed a full signed request internally and
+    # run 2000+ characters — String(500) truncated silently under SQLite (no length
+    # enforcement) but would hard-fail on Postgres, same class of bug as Capability.id.
+    bedrock_api_key: Mapped[str | None] = mapped_column(Text, nullable=True)
     bedrock_region: Mapped[str | None] = mapped_column(String(32), nullable=True)
     bedrock_model: Mapped[str | None] = mapped_column(String(200), nullable=True)
 
