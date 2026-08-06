@@ -47,11 +47,6 @@ const FORMAT_OPTIONS: { value: QuoteFormat; label: string; icon: typeof FileWord
   { value: "proposal", label: "Proposal (Branded PDF)", icon: FileTextOutlined },
 ];
 
-function parsePrice(price: string): number {
-  const digits = price.replace(/,/g, "").match(/[\d.]+/);
-  return digits ? parseFloat(digits[0]) : 0;
-}
-
 function PackageCard({
   pkg,
   inCart,
@@ -133,9 +128,6 @@ function PackageCard({
           <Title level={4} style={{ marginBottom: 0 }}>
             {pkg.name}
           </Title>
-          <Text strong style={{ color: theme.accent, fontSize: 20 }}>
-            {pkg.monthlyPrice}
-          </Text>
         </div>
       </div>
 
@@ -191,9 +183,6 @@ function DetailsModal({
           <Title level={4} style={{ marginBottom: 0 }}>
             {pkg.name}
           </Title>
-          <Text strong style={{ color: theme.accent, fontSize: 22 }}>
-            {pkg.monthlyPrice}
-          </Text>
         </div>
       </div>
       <Paragraph type="secondary" className="mt-2">
@@ -262,14 +251,6 @@ function CompareModal({
             </tr>
           </thead>
           <tbody>
-            <tr>
-              <td style={{ padding: "8px 10px", fontWeight: 600, whiteSpace: "nowrap" }}>Price</td>
-              {packages.map((p) => (
-                <td key={p.id} style={{ padding: "8px 10px", fontWeight: 700 }}>
-                  {p.monthlyPrice}
-                </td>
-              ))}
-            </tr>
             <tr>
               <td style={{ padding: "8px 10px", fontWeight: 600, verticalAlign: "top", whiteSpace: "nowrap" }}>Summary</td>
               {packages.map((p) => (
@@ -342,7 +323,6 @@ export default function ServiceCatalogPage() {
     .map((id) => packages.find((p) => p.id === id))
     .filter((p): p is ServicePackage => !!p);
   const detailsPkg = packages.find((p) => p.id === detailsId) ?? null;
-  const total = cartPackages.reduce((sum, p) => sum + parsePrice(p.monthlyPrice), 0);
 
   const toggleCart = (id: string, add: boolean) => {
     setCart((prev) => (add ? [...prev, id] : prev.filter((x) => x !== id)));
@@ -501,13 +481,10 @@ export default function ServiceCatalogPage() {
                   onClose={() => toggleCart(p.id, false)}
                   style={{ background: theme.soft, color: theme.accent, borderColor: `${theme.accent}33` }}
                 >
-                  {p.name} · {p.monthlyPrice}
+                  {p.name}
                 </Tag>
               );
             })}
-            <Text strong className="ml-auto">
-              Total: ${total.toLocaleString(undefined, { minimumFractionDigits: 2 })}/mo
-            </Text>
           </div>
 
           <div className="flex items-end gap-3">
