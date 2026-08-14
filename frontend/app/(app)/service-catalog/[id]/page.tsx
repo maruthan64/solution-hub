@@ -4,7 +4,7 @@ import { use, useEffect, useState } from "react";
 import Link from "next/link";
 import { Button, Card, Input, InputNumber, Spin, Typography, message } from "antd";
 import { ArrowLeftOutlined, DeleteOutlined, PlusOutlined, SaveOutlined } from "@ant-design/icons";
-import { getServicePackage, updateServicePackage } from "@/lib/api";
+import { getCurrentUser, getServicePackage, updateServicePackage } from "@/lib/api";
 import { useApi } from "@/lib/useApi";
 import { ResourceLine } from "@/lib/types";
 import { getPackageTheme } from "@/lib/serviceCatalogTheme";
@@ -14,6 +14,8 @@ const { Title, Text } = Typography;
 export default function ServicePackageEditPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const { data: pkg, loading } = useApi(() => getServicePackage(id), [id]);
+  const { data: currentUser } = useApi(getCurrentUser);
+  const canEdit = currentUser?.role === "Owner" || currentUser?.role === "Architect";
   const [name, setName] = useState("");
   const [tagline, setTagline] = useState("");
   const [monthlyPrice, setMonthlyPrice] = useState("");
@@ -90,16 +92,18 @@ export default function ServicePackageEditPage({ params }: { params: Promise<{ i
             Edit Package
           </Title>
         </div>
-        <Button
-          type="primary"
-          icon={<SaveOutlined />}
-          disabled={!isDirty}
-          loading={saving}
-          onClick={handleSave}
-          style={{ background: isDirty ? theme.accent : undefined, borderColor: isDirty ? theme.accent : undefined }}
-        >
-          Save Changes
-        </Button>
+        {canEdit && (
+          <Button
+            type="primary"
+            icon={<SaveOutlined />}
+            disabled={!isDirty}
+            loading={saving}
+            onClick={handleSave}
+            style={{ background: isDirty ? theme.accent : undefined, borderColor: isDirty ? theme.accent : undefined }}
+          >
+            Save Changes
+          </Button>
+        )}
       </div>
 
       <Card title="Package Details" style={{ borderTop: `4px solid ${theme.accent}` }}>
@@ -108,19 +112,19 @@ export default function ServicePackageEditPage({ params }: { params: Promise<{ i
             <Text type="secondary" className="text-xs block mb-1">
               Name
             </Text>
-            <Input value={name} onChange={(e) => setName(e.target.value)} size="large" />
+            <Input value={name} onChange={(e) => setName(e.target.value)} size="large" disabled={!canEdit} />
           </div>
           <div>
             <Text type="secondary" className="text-xs block mb-1">
               Tagline
             </Text>
-            <Input value={tagline} onChange={(e) => setTagline(e.target.value)} size="large" />
+            <Input value={tagline} onChange={(e) => setTagline(e.target.value)} size="large" disabled={!canEdit} />
           </div>
           <div style={{ maxWidth: 220 }}>
             <Text type="secondary" className="text-xs block mb-1">
               Monthly Price
             </Text>
-            <Input value={monthlyPrice} onChange={(e) => setMonthlyPrice(e.target.value)} size="large" />
+            <Input value={monthlyPrice} onChange={(e) => setMonthlyPrice(e.target.value)} size="large" disabled={!canEdit} />
           </div>
         </div>
       </Card>
@@ -128,9 +132,11 @@ export default function ServicePackageEditPage({ params }: { params: Promise<{ i
       <Card
         title="Resource Bundle"
         extra={
-          <Button size="small" icon={<PlusOutlined />} onClick={addResource}>
-            Add Resource
-          </Button>
+          canEdit && (
+            <Button size="small" icon={<PlusOutlined />} onClick={addResource}>
+              Add Resource
+            </Button>
+          )
         }
       >
         <div className="flex flex-col gap-2">
@@ -147,25 +153,30 @@ export default function ServicePackageEditPage({ params }: { params: Promise<{ i
                 onChange={(e) => updateResource(i, { service: e.target.value })}
                 placeholder="e.g. Virtual Machine (t3.large)"
                 style={{ flex: 2 }}
+                disabled={!canEdit}
               />
               <InputNumber
                 value={r.quantity}
                 onChange={(v) => updateResource(i, { quantity: v ?? 0 })}
                 min={0}
                 style={{ width: 90 }}
+                disabled={!canEdit}
               />
               <Input
                 value={r.purpose}
                 onChange={(e) => updateResource(i, { purpose: e.target.value })}
                 placeholder="e.g. Application workloads"
                 style={{ flex: 2 }}
+                disabled={!canEdit}
               />
-              <Button icon={<DeleteOutlined />} danger onClick={() => removeResource(i)} style={{ width: 32, flexShrink: 0 }} />
+              {canEdit && (
+                <Button icon={<DeleteOutlined />} danger onClick={() => removeResource(i)} style={{ width: 32, flexShrink: 0 }} />
+              )}
             </div>
           ))}
           {resources.length === 0 && (
             <Text type="secondary" className="text-sm py-4 text-center">
-              No resources yet — click &quot;Add Resource&quot; to start the bundle.
+              No resources yet{canEdit ? ' — click "Add Resource" to start the bundle.' : "."}
             </Text>
           )}
         </div>

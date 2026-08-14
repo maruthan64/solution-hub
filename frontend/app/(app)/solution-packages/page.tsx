@@ -108,7 +108,7 @@ export default function SolutionPackagesPage() {
               actions={
                 canEdit
                   ? [
-                      <Link key="edit" href={`/solution-packages/${p.id}`}>
+                      <Link key="edit" href={`/solution-packages/${p.id}?edit=1`}>
                         <span className="inline-flex items-center gap-1.5">
                           <EditOutlined /> Edit
                         </span>
@@ -164,6 +164,10 @@ export default function SolutionPackagesPage() {
                     {p.pricingNote}
                   </Tag>
                 )}
+
+                <Text style={{ color: "#0F766E", fontSize: 12.5, fontWeight: 500, display: "block", marginTop: 10 }}>
+                  View full details →
+                </Text>
               </Link>
             </Card>
           ))}

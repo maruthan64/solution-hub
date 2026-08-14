@@ -7,6 +7,26 @@ through commit history.
 
 ## Unreleased
 
+## 2026-08-14 — Edit permissions locked down; Solution Packages gets a real view/edit split
+
+Service Catalog and Solution Packages' detail/edit pages had no role check at all — any
+logged-in user (Sales included) could reach a fully-editable form with live Save/Delete
+buttons. The backend already rejected the actual write with a 403, but the UI shouldn't
+have offered it in the first place.
+
+- Service Catalog and Solution Packages: "Edit"/"New Package" actions and the detail
+  pages themselves are now Owner/Architect only. Everyone else sees read-only content,
+  no edit affordances.
+- Solution Packages detail page redesigned: viewing ("View full details") no longer
+  drops straight into an editable form — it's a clean read-only page now, with a
+  separate "Edit" button (editors only) that switches into edit mode, plus a "Cancel"
+  to discard changes and return to the view. Matches how Service Catalog already
+  separates its read-only details modal from its edit page.
+- Solution Packages cards gained the same "View full details →" link Service Catalog
+  cards already have.
+- Edit-mode input fields sized down from `size="large"` to default, matching the rest
+  of the app.
+
 ## 2026-08-14 — Blueprint Navy sidebar, fixed-viewport layout, more dashboard stats
 
 - Sidebar restyled to Blueprint Navy (`#0B1F3A`), matching the login screen's existing

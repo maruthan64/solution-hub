@@ -32,7 +32,7 @@ import {
   ShoppingCartOutlined,
   StarFilled,
 } from "@ant-design/icons";
-import { createCostEstimate, generateQuote, getProjects, getServiceCatalog, QuoteFormat } from "@/lib/api";
+import { createCostEstimate, generateQuote, getCurrentUser, getProjects, getServiceCatalog, QuoteFormat } from "@/lib/api";
 import { useApi } from "@/lib/useApi";
 import { ServicePackage } from "@/lib/types";
 import { getPackageTheme } from "@/lib/serviceCatalogTheme";
@@ -54,6 +54,7 @@ function PackageCard({
   compareChecked,
   onToggleCompare,
   onViewDetails,
+  canEdit,
 }: {
   pkg: ServicePackage;
   inCart: boolean;
@@ -61,6 +62,7 @@ function PackageCard({
   compareChecked: boolean;
   onToggleCompare: (checked: boolean) => void;
   onViewDetails: () => void;
+  canEdit: boolean;
 }) {
   const theme = getPackageTheme(pkg.id);
   const Icon = theme.icon;
@@ -99,13 +101,17 @@ function PackageCard({
             <span className="text-xs">Compare</span>
           </Checkbox>
         </span>,
-        <span key="edit" onClick={(e) => e.stopPropagation()}>
-          <Link href={`/service-catalog/${pkg.id}`}>
-            <Button type="link" size="small" icon={<EditOutlined />} style={{ color: theme.accent }}>
-              Edit
-            </Button>
-          </Link>
-        </span>,
+        ...(canEdit
+          ? [
+              <span key="edit" onClick={(e: React.MouseEvent) => e.stopPropagation()}>
+                <Link href={`/service-catalog/${pkg.id}`}>
+                  <Button type="link" size="small" icon={<EditOutlined />} style={{ color: theme.accent }}>
+                    Edit
+                  </Button>
+                </Link>
+              </span>,
+            ]
+          : []),
       ]}
     >
       {theme.popular && (
@@ -283,6 +289,8 @@ export default function ServiceCatalogPage() {
   const router = useRouter();
   const { data: packages, loading, refetch } = useApi(getServiceCatalog);
   const { data: projects } = useApi(getProjects);
+  const { data: currentUser } = useApi(getCurrentUser);
+  const canEdit = currentUser?.role === "Owner" || currentUser?.role === "Architect";
   const [newPackageOpen, setNewPackageOpen] = useState(false);
   const [cart, setCart] = useState<string[]>([]);
   const [compareIds, setCompareIds] = useState<string[]>([]);
@@ -386,6 +394,7 @@ export default function ServiceCatalogPage() {
             compareChecked={compareIds.includes(pkg.id)}
             onToggleCompare={(add) => toggleCompare(pkg.id, add)}
             onViewDetails={() => setDetailsId(pkg.id)}
+            canEdit={canEdit}
           />
         </Col>
       ))}
@@ -405,9 +414,11 @@ export default function ServiceCatalogPage() {
             to the cart, then generate a quote.
           </Text>
         </div>
-        <Button type="primary" icon={<PlusOutlined />} onClick={() => setNewPackageOpen(true)}>
-          New Package
-        </Button>
+        {canEdit && (
+          <Button type="primary" icon={<PlusOutlined />} onClick={() => setNewPackageOpen(true)}>
+            New Package
+          </Button>
+        )}
       </div>
 
       {projectId && (
