@@ -231,24 +231,32 @@ like any other code change — no manual `ALTER TABLE` over SSH.
 **One-time bootstrap for an instance that predates Alembic** (only needed once, the
 first time you deploy a commit that adds `backend/alembic/`): the instance's Postgres
 already has most tables from before migrations were tracked, so `alembic upgrade head`
-can't run cold — it would try to re-create tables that already exist. Do this instead,
-in order:
+can't run cold — it would try to re-create tables that already exist. Run this whole
+block, in order, over SSH from a machine on the allowed IP (not from the app repo's own
+`sagen.sh deploy`, which doesn't know about this one-time case):
 
 ```bash
+ssh -i <cloudsolutionhub-key.pem> ubuntu@15.252.84.91
+
 cd ~/sa-generator && git pull
 cd backend && source venv/bin/activate && pip install -r requirements.txt
 
 # Restart FIRST — Base.metadata.create_all() runs on app startup and creates any
 # brand-new tables the new code needs (harmless no-op for tables that already exist).
 sudo systemctl restart sagen-backend sagen-frontend
+sleep 2
 
 # NOW the DB matches current models closely enough to stamp — this records
 # "you're already at this migration" without re-running its ALTER statements.
 alembic stamp head
+
+# Verify
+curl -sf http://127.0.0.1:8000/api/health && echo
+curl -s -o /dev/null -w "frontend: %{http_code}\n" http://127.0.0.1:3000
 ```
 
 After that one-time stamp, every future deploy just works through the normal
-`sagen.sh deploy` flow.
+`sagen.sh deploy` flow — `bash docs/ec2/sagen.sh deploy` and nothing else.
 
 ### 6. nginx + free TLS via Let's Encrypt
 
