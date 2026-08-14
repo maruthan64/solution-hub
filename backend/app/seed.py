@@ -1,3 +1,5 @@
+import os
+
 from app.auth import hash_password
 from app.database import Base, SessionLocal, engine
 from app.models import (
@@ -338,16 +340,18 @@ def seed():
     db = SessionLocal()
     try:
         if db.query(User).count() == 0:
+            admin_username = os.getenv("ADMIN_USERNAME", "admin")
+            admin_password = os.getenv("ADMIN_PASSWORD", "admin123")
             db.add_all(
                 [
                     User(
                         id="u-1",
-                        username="admin",
+                        username=admin_username,
                         name="M. Maruthan",
                         email="maruthan64@gmail.com",
                         role="Owner",
                         status="Active",
-                        password_hash=hash_password("admin123"),
+                        password_hash=hash_password(admin_password),
                     ),
                     User(id="u-2", name="S. Iyer", email="s.iyer@example.com", role="Architect", status="Active"),
                     User(id="u-3", name="R. Chen", email="r.chen@example.com", role="Reviewer", status="Active"),

@@ -7,6 +7,29 @@ through commit history.
 
 ## Unreleased
 
+## 2026-08-14 — Replaced the EC2 instance (lost SSH key) and redeployed fresh
+
+The private key for `cloudsolutionhub-key` was gone — not recoverable, not on any
+machine we could find. Rather than the AWS EBS-volume-swap recovery trick, the call
+was made to terminate and redeploy fresh (`terraform apply` with a new key pair,
+`i-06c1656349603a9a3` → `i-00a2673851b62b783`), accepting the live database and any
+uploaded files were lost. Same Elastic IP, same VPC/subnet/security group — only the
+instance itself was replaced.
+
+Full fresh deploy: cloned the repo, backend venv + deps, `alembic stamp head` on the
+newly-created tables (a brand new DB doesn't need the diff-based migrations run, since
+`create_all` already builds every table matching current models), seeded, frontend
+build, systemd units, nginx. New random `JWT_SECRET` and Postgres password generated
+for this environment, not reused from anywhere.
+
+While seeding, found that `seed.py` never actually read `ADMIN_USERNAME`/
+`ADMIN_PASSWORD` from the environment — it hardcoded `admin`/`admin123` regardless of
+what `.env` said, silently. Fixed: `seed.py` now reads both env vars, falling back to
+the old hardcoded values only if they're unset (keeps local dev's zero-config
+experience while making a real deploy's `.env` values actually take effect). The new
+instance's admin password was rotated off the exposed default immediately after
+discovering this.
+
 ## 2026-08-14 — Local development now runs on Postgres, matching EC2
 
 SQLite never enforced column length, so a value that overflowed a `VARCHAR` column
