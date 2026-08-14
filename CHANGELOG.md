@@ -7,6 +7,14 @@ through commit history.
 
 ## Unreleased
 
+## 2026-08-14 — Documented the feature-development process
+
+New `docs/development/adding-a-feature.md` — the actual step-by-step process for adding
+a feature, backend through deploy, grounded in what was really done for role-based access
+control, Solution Packages, and Alembic rather than written as an aspirational ideal.
+Linked from `project-documentation.md`, and fixed that doc's stale test count (77 → 107
+backend tests, picked up along the way).
+
 ## 2026-08-14 — Reorganized docs/ into deployment / development / how-to-use
 
 `docs/ec2/` mixed Terraform, the deploy script, and the deploy guide with no clear home

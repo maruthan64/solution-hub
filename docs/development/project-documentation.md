@@ -2,9 +2,13 @@
 
 This is retrospective documentation of the application **as it exists today** —
 every feature, model, and endpoint named here is real and verified against the
-codebase (backend: 77 pytest tests passing; frontend: 8 vitest tests passing).
+codebase (backend: 107 pytest tests passing; frontend: 8 vitest tests passing).
 Where something is a known gap rather than a built feature, it's labeled as such
 rather than glossed over.
+
+Looking to actually build something? See
+[Adding a New Feature](adding-a-feature.md) for the practical, step-by-step process —
+this document is the reference for how the system works, not how to change it.
 
 Six sections, following the standard pre-build planning-doc set — written here
 after the fact, as living documentation of what was actually built:
