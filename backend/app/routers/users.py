@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 from app.audit import log_action
 from app.auth import hash_password, require_role, require_user
 from app.database import get_db
-from app.models import User
+from app.models import RolePermission, User
 from app.rate_limit import is_username_locked, unlock_username
 from app.schemas import (
     CreateUserRequest,
@@ -19,10 +19,12 @@ from app.schemas import (
 
 router = APIRouter(prefix="/api/users", tags=["users"])
 
-VALID_ROLES = {"Owner", "Architect", "Reviewer", "Viewer"}
-
 
 USERNAME_RE = re.compile(r"^[a-z0-9.]+$")
+
+
+def _valid_roles(db: Session) -> set[str]:
+    return {rp.role for rp in db.query(RolePermission).all()}
 
 
 def to_out(u: User) -> UserOut:
@@ -40,8 +42,9 @@ def create_user(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_role("Owner")),
 ):
-    if payload.role not in VALID_ROLES:
-        raise HTTPException(status_code=400, detail=f"role must be one of {sorted(VALID_ROLES)}")
+    valid_roles = _valid_roles(db)
+    if payload.role not in valid_roles:
+        raise HTTPException(status_code=400, detail=f"role must be one of {sorted(valid_roles)}")
 
     email = payload.email.strip() if payload.email and payload.email.strip() else None
     if email and db.query(User).filter(User.email == email).first():
@@ -79,8 +82,9 @@ def update_user_role(
     user = db.get(User, user_id)
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
-    if payload.role not in VALID_ROLES:
-        raise HTTPException(status_code=400, detail=f"role must be one of {sorted(VALID_ROLES)}")
+    valid_roles = _valid_roles(db)
+    if payload.role not in valid_roles:
+        raise HTTPException(status_code=400, detail=f"role must be one of {sorted(valid_roles)}")
     if user.role == "Owner" and payload.role != "Owner" and db.query(User).filter(User.role == "Owner").count() <= 1:
         raise HTTPException(status_code=400, detail="Can't change the role of the last remaining Owner.")
 

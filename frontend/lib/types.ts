@@ -54,9 +54,15 @@ export interface AppUser {
   id: string;
   name: string;
   email: string | null;
-  role: "Owner" | "Architect" | "Reviewer" | "Viewer";
+  role: string;
   status: "Active" | "Invited";
   locked: boolean;
+}
+
+export interface RolePermission {
+  role: string;
+  allowedModules: string[];
+  builtIn: boolean;
 }
 
 export interface AuditEntry {
@@ -109,6 +115,23 @@ export interface Capability {
   githubUrl: string | null;
   certifications: string[];
   caseStudies: CaseStudy[];
+}
+
+export interface SolutionPackageService {
+  service: string;
+  purpose: string;
+}
+
+export interface SolutionPackage {
+  id: string;
+  name: string;
+  cloud: string;
+  tagline: string;
+  outcome: string;
+  assumptions: string[];
+  services: SolutionPackageService[];
+  referenceArchitecture: string;
+  pricingNote: string;
 }
 
 export interface Connector {

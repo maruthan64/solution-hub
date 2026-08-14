@@ -8,7 +8,9 @@ import type {
   KnowledgeDoc,
   Project,
   Quote,
+  RolePermission,
   ServicePackage,
+  SolutionPackage,
 } from "@/lib/types";
 
 export interface CurrentUser {
@@ -16,8 +18,9 @@ export interface CurrentUser {
   name: string;
   username: string;
   email: string;
-  role: "Owner" | "Architect" | "Reviewer" | "Viewer";
+  role: string;
   mustChangePassword: boolean;
+  allowedModules: string[];
 }
 
 export const getCurrentUser = () => apiFetch<CurrentUser>("/api/auth/me");
@@ -109,6 +112,17 @@ export const updateUserRole = (id: string, role: string) =>
   apiFetch<AppUser>(`/api/users/${id}/role`, { method: "PUT", body: JSON.stringify({ role }) });
 export const resetUserPassword = (id: string, password: string) =>
   apiFetch<AppUser>(`/api/users/${id}/reset-password`, { method: "POST", body: JSON.stringify({ password }) });
+
+export const getRolePermissions = () => apiFetch<RolePermission[]>("/api/role-permissions");
+export const createRolePermission = (role: string, allowedModules: string[]) =>
+  apiFetch<RolePermission>("/api/role-permissions", { method: "POST", body: JSON.stringify({ role, allowedModules }) });
+export const updateRolePermission = (role: string, allowedModules: string[]) =>
+  apiFetch<RolePermission>(`/api/role-permissions/${encodeURIComponent(role)}`, {
+    method: "PUT",
+    body: JSON.stringify({ allowedModules }),
+  });
+export const deleteRolePermission = (role: string) =>
+  apiFetch<{ ok: boolean }>(`/api/role-permissions/${encodeURIComponent(role)}`, { method: "DELETE" });
 export const unlockUser = (id: string) => apiFetch<AppUser>(`/api/users/${id}/unlock`, { method: "POST" });
 
 // No Content-Type header here — the browser sets multipart/form-data with the
@@ -293,6 +307,28 @@ export const updateCapability = (id: string, input: CapabilityInput) =>
 export const deleteCapability = (id: string) =>
   apiFetch<{ ok: boolean }>(`/api/capabilities/${id}`, { method: "DELETE" });
 export const exportCapabilityMatrixUrl = (format: "docx" | "pdf") => `/api/capabilities/export?format=${format}`;
+
+export interface SolutionPackageInput {
+  name: string;
+  cloud: string;
+  tagline: string;
+  outcome: string;
+  assumptions: string[];
+  services: { service: string; purpose: string }[];
+  referenceArchitecture: string;
+  pricingNote: string;
+}
+
+export const getSolutionPackages = () => apiFetch<SolutionPackage[]>("/api/solution-packages");
+export const getSolutionPackage = (id: string) => apiFetch<SolutionPackage>(`/api/solution-packages/${id}`);
+export const createSolutionPackage = (input: SolutionPackageInput) =>
+  apiFetch<SolutionPackage>("/api/solution-packages", { method: "POST", body: JSON.stringify(input) });
+export const updateSolutionPackage = (id: string, input: SolutionPackageInput) =>
+  apiFetch<SolutionPackage>(`/api/solution-packages/${id}`, { method: "PUT", body: JSON.stringify(input) });
+export const deleteSolutionPackage = (id: string) =>
+  apiFetch<{ ok: boolean }>(`/api/solution-packages/${id}`, { method: "DELETE" });
+export const exportSolutionPackageUrl = (id: string, format: "docx" | "pdf") =>
+  `/api/solution-packages/${id}/export?format=${format}`;
 
 export const getConnectors = () => apiFetch<Connector[]>("/api/mcp/connectors");
 

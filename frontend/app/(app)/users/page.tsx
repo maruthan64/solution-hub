@@ -4,6 +4,7 @@ import { useState } from "react";
 import {
   Button,
   Card,
+  Checkbox,
   Dropdown,
   Form,
   Input,
@@ -16,25 +17,43 @@ import {
   message,
 } from "antd";
 import {
+  DeleteOutlined,
   DownOutlined,
+  EditOutlined,
   ExclamationCircleOutlined,
   KeyOutlined,
   LockOutlined,
   PlusOutlined,
+  SafetyOutlined,
   UnlockOutlined,
   UserSwitchOutlined,
 } from "@ant-design/icons";
-import { createUser, deleteUser, getCurrentUser, getUsers, resetUserPassword, unlockUser, updateUserRole } from "@/lib/api";
+import {
+  createRolePermission,
+  createUser,
+  deleteRolePermission,
+  deleteUser,
+  getCurrentUser,
+  getRolePermissions,
+  getUsers,
+  resetUserPassword,
+  unlockUser,
+  updateRolePermission,
+  updateUserRole,
+} from "@/lib/api";
 import { useApi } from "@/lib/useApi";
-import { AppUser } from "@/lib/types";
+import { AppUser, RolePermission } from "@/lib/types";
+import { NAV_ITEMS } from "@/lib/nav";
 
 const { Title, Text } = Typography;
-
-const ROLES = ["Owner", "Architect", "Reviewer", "Viewer"];
 
 export default function UsersPage() {
   const { data: users, loading, refetch } = useApi(getUsers);
   const { data: currentUser } = useApi(getCurrentUser);
+  const { data: roles, refetch: refetchRoles } = useApi(getRolePermissions);
+  const isOwner = currentUser?.role === "Owner";
+  const roleNames = roles?.map((r) => r.role) ?? ["Owner", "Architect", "Reviewer", "Viewer"];
+
   const [modalOpen, setModalOpen] = useState(false);
   const [form] = Form.useForm();
   const [creating, setCreating] = useState(false);
@@ -47,6 +66,13 @@ export default function UsersPage() {
   const [passwordTarget, setPasswordTarget] = useState<AppUser | null>(null);
   const [passwordForm] = Form.useForm();
   const [passwordSaving, setPasswordSaving] = useState(false);
+
+  const [rolesModalOpen, setRolesModalOpen] = useState(false);
+  const [roleEditTarget, setRoleEditTarget] = useState<RolePermission | "new" | null>(null);
+  const [roleNameValue, setRoleNameValue] = useState("");
+  const [roleModulesValue, setRoleModulesValue] = useState<string[]>([]);
+  const [roleEditSaving, setRoleEditSaving] = useState(false);
+  const [deletingRole, setDeletingRole] = useState<string | null>(null);
 
   const [messageApi, contextHolder] = message.useMessage();
   const [modalApi, modalContextHolder] = Modal.useModal();
@@ -149,6 +175,64 @@ export default function UsersPage() {
     }
   };
 
+  const openNewRole = () => {
+    setRoleEditTarget("new");
+    setRoleNameValue("");
+    setRoleModulesValue([]);
+  };
+
+  const openEditRole = (role: RolePermission) => {
+    setRoleEditTarget(role);
+    setRoleNameValue(role.role);
+    setRoleModulesValue(role.allowedModules);
+  };
+
+  const handleSaveRoleDefinition = async () => {
+    if (!roleEditTarget) return;
+    setRoleEditSaving(true);
+    try {
+      if (roleEditTarget === "new") {
+        if (!roleNameValue.trim()) {
+          messageApi.error("Enter a role name.");
+          return;
+        }
+        await createRolePermission(roleNameValue.trim(), roleModulesValue);
+        messageApi.success(`Role "${roleNameValue.trim()}" created.`);
+      } else {
+        await updateRolePermission(roleEditTarget.role, roleModulesValue);
+        messageApi.success(`Updated "${roleEditTarget.role}"'s sidebar access.`);
+      }
+      setRoleEditTarget(null);
+      refetchRoles();
+    } catch (err) {
+      messageApi.error(err instanceof Error ? err.message : "Failed to save role.");
+    } finally {
+      setRoleEditSaving(false);
+    }
+  };
+
+  const handleDeleteRole = (role: RolePermission) => {
+    modalApi.confirm({
+      title: `Delete role "${role.role}"?`,
+      icon: <ExclamationCircleOutlined />,
+      content: "This can't be undone. Roles still assigned to a user can't be deleted.",
+      okText: "Delete",
+      okButtonProps: { danger: true },
+      onOk: async () => {
+        setDeletingRole(role.role);
+        try {
+          await deleteRolePermission(role.role);
+          messageApi.success(`Role "${role.role}" deleted.`);
+          refetchRoles();
+        } catch (err) {
+          messageApi.error(err instanceof Error ? err.message : "Failed to delete role.");
+        } finally {
+          setDeletingRole(null);
+        }
+      },
+    });
+  };
+
   return (
     <div className="flex flex-col gap-4">
       {contextHolder}
@@ -160,9 +244,16 @@ export default function UsersPage() {
           </Title>
           <Text type="secondary">Manage who can access this organization and what they can do.</Text>
         </div>
-        <Button type="primary" icon={<PlusOutlined />} onClick={() => setModalOpen(true)}>
-          Create User
-        </Button>
+        <div className="flex gap-2">
+          {isOwner && (
+            <Button icon={<SafetyOutlined />} onClick={() => setRolesModalOpen(true)}>
+              Manage Roles
+            </Button>
+          )}
+          <Button type="primary" icon={<PlusOutlined />} onClick={() => setModalOpen(true)}>
+            Create User
+          </Button>
+        </div>
       </div>
 
       <Card>
@@ -267,7 +358,7 @@ export default function UsersPage() {
             <Input placeholder="e.g. j.rivera" size="large" />
           </Form.Item>
           <Form.Item label="Role" name="role">
-            <Select size="large" options={ROLES.map((r) => ({ value: r, label: r }))} />
+            <Select size="large" options={roleNames.map((r) => ({ value: r, label: r }))} />
           </Form.Item>
           <Form.Item
             label="Password"
@@ -295,7 +386,7 @@ export default function UsersPage() {
           size="large"
           value={roleValue}
           onChange={setRoleValue}
-          options={ROLES.map((r) => ({ value: r, label: r }))}
+          options={roleNames.map((r) => ({ value: r, label: r }))}
           style={{ width: "100%" }}
         />
       </Modal>
@@ -321,6 +412,93 @@ export default function UsersPage() {
         <Text type="secondary" className="text-xs">
           No email is sent — share the new password with them directly.
         </Text>
+      </Modal>
+
+      <Modal
+        title="Manage Roles"
+        open={rolesModalOpen}
+        onCancel={() => setRolesModalOpen(false)}
+        footer={null}
+        width={640}
+        destroyOnHidden
+      >
+        <div className="flex flex-col gap-3">
+          <div className="flex justify-between items-center">
+            <Text type="secondary">Each role&apos;s sidebar access controls what its users can see.</Text>
+            <Button size="small" icon={<PlusOutlined />} onClick={openNewRole}>
+              New Role
+            </Button>
+          </div>
+          {(roles ?? []).map((role) => (
+            <Card key={role.role} size="small">
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex flex-col gap-1.5 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <Text strong>{role.role}</Text>
+                    {role.builtIn && <Tag>Built-in</Tag>}
+                  </div>
+                  <div className="flex flex-wrap gap-1">
+                    {role.allowedModules.length === 0 ? (
+                      <Text type="secondary" className="text-xs">
+                        No sidebar access
+                      </Text>
+                    ) : (
+                      NAV_ITEMS.filter((item) => role.allowedModules.includes(item.key)).map((item) => (
+                        <Tag key={item.key} color="blue">
+                          {item.label}
+                        </Tag>
+                      ))
+                    )}
+                  </div>
+                </div>
+                <div className="flex gap-1 shrink-0">
+                  <Button size="small" icon={<EditOutlined />} onClick={() => openEditRole(role)} />
+                  {!role.builtIn && (
+                    <Button
+                      size="small"
+                      danger
+                      icon={<DeleteOutlined />}
+                      loading={deletingRole === role.role}
+                      onClick={() => handleDeleteRole(role)}
+                    />
+                  )}
+                </div>
+              </div>
+            </Card>
+          ))}
+        </div>
+      </Modal>
+
+      <Modal
+        title={roleEditTarget === "new" ? "New Role" : `Edit role — ${roleEditTarget ? roleEditTarget.role : ""}`}
+        open={!!roleEditTarget}
+        onCancel={() => setRoleEditTarget(null)}
+        onOk={handleSaveRoleDefinition}
+        okText="Save"
+        confirmLoading={roleEditSaving}
+        destroyOnHidden
+      >
+        <div className="flex flex-col gap-4">
+          {roleEditTarget === "new" && (
+            <Input
+              placeholder="e.g. Sales"
+              size="large"
+              value={roleNameValue}
+              onChange={(e) => setRoleNameValue(e.target.value)}
+            />
+          )}
+          <div>
+            <Text type="secondary" className="text-xs">
+              Sidebar access
+            </Text>
+            <Checkbox.Group
+              className="flex flex-col gap-2 mt-2"
+              value={roleModulesValue}
+              onChange={(vals) => setRoleModulesValue(vals as string[])}
+              options={NAV_ITEMS.map((item) => ({ label: item.label, value: item.key }))}
+            />
+          </div>
+        </div>
       </Modal>
     </div>
   );

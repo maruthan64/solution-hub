@@ -107,6 +107,7 @@ class CurrentUserOut(BaseModel):
     email: str
     role: str
     mustChangePassword: bool = False
+    allowedModules: list[str] = []
 
 
 class ChangePasswordRequest(BaseModel):
@@ -239,6 +240,22 @@ class UpdateUserRoleRequest(BaseModel):
     role: str
 
 
+class RolePermissionOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    role: str
+    allowedModules: list[str]
+    builtIn: bool
+
+
+class CreateRolePermissionRequest(BaseModel):
+    role: str = Field(min_length=1, max_length=32)
+    allowedModules: list[str] = []
+
+
+class UpdateRolePermissionRequest(BaseModel):
+    allowedModules: list[str] = []
+
+
 class ResetPasswordRequest(BaseModel):
     password: str = Field(min_length=8)
 
@@ -332,3 +349,35 @@ class CapabilityUpdate(BaseModel):
     githubUrl: str | None = None
     certifications: list[str] = Field(default_factory=list)
     caseStudies: list[CaseStudy] = Field(default_factory=list)
+
+
+class SolutionPackageService(BaseModel):
+    service: str
+    purpose: str
+
+
+class SolutionPackageOut(BaseModel):
+    id: str
+    name: str
+    cloud: str
+    tagline: str
+    outcome: str
+    assumptions: list[str]
+    services: list[SolutionPackageService]
+    referenceArchitecture: str
+    pricingNote: str
+
+
+class SolutionPackageCreate(BaseModel):
+    name: str = Field(min_length=1)
+    cloud: str
+    tagline: str = ""
+    outcome: str = ""
+    assumptions: list[str] = Field(default_factory=list)
+    services: list[SolutionPackageService] = Field(default_factory=list)
+    referenceArchitecture: str = ""
+    pricingNote: str = ""
+
+
+class SolutionPackageUpdate(SolutionPackageCreate):
+    pass

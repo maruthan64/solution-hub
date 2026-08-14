@@ -26,6 +26,17 @@ class User(Base):
     must_change_password: Mapped[bool] = mapped_column(Boolean, default=True, server_default="true")
 
 
+class RolePermission(Base):
+    """Which sidebar/nav modules a role can see — e.g. a "Sales" role scoped to just
+    Service Catalog, Capabilities, and Knowledge Base. Role names beyond the four built-ins
+    (Owner/Architect/Reviewer/Viewer) only exist because a row for them exists here."""
+
+    __tablename__ = "role_permissions"
+
+    role: Mapped[str] = mapped_column(String(32), primary_key=True)
+    allowed_modules: Mapped[list] = mapped_column(JSON, default=list)  # nav keys, e.g. ["/service-catalog"]
+
+
 class Project(Base):
     __tablename__ = "projects"
 
@@ -174,4 +185,23 @@ class Capability(Base):
     github_url: Mapped[str | None] = mapped_column(String(400), nullable=True)
     certifications: Mapped[list] = mapped_column(JSON, default=list)  # ["AWS Advanced Consulting Partner", ...]
     case_studies: Mapped[list] = mapped_column(JSON, default=list)  # [{customer, outcome}, ...]
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=now, onupdate=now)
+
+
+class SolutionPackage(Base):
+    """A named, use-case-specific offering (e.g. 'SAP on AWS Migration') built around a
+    business outcome and a reference architecture — distinct from Service Catalog's generic
+    Basic/Intermediate/Advanced sizing tiers, which price monthly hosting, not a project."""
+
+    __tablename__ = "solution_packages"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    name: Mapped[str] = mapped_column(String(200))
+    cloud: Mapped[str] = mapped_column(String(32))
+    tagline: Mapped[str] = mapped_column(String(300), default="")
+    outcome: Mapped[str] = mapped_column(Text, default="")  # the business story: why a customer buys this
+    assumptions: Mapped[list] = mapped_column(JSON, default=list)  # ["Customer has an existing AWS account", ...]
+    services: Mapped[list] = mapped_column(JSON, default=list)  # [{service, purpose}, ...]
+    reference_architecture: Mapped[str] = mapped_column(Text, default="")
+    pricing_note: Mapped[str] = mapped_column(String(200), default="")  # e.g. "Starting at $15,000, scoped per estate"
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=now, onupdate=now)

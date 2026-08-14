@@ -1,12 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
 import { Layout, Menu, Avatar, Dropdown, Typography } from "antd";
 import { LogoutOutlined, UserOutlined } from "@ant-design/icons";
 import { NAV_ITEMS } from "@/lib/nav";
-import { getCurrentUser } from "@/lib/api";
+import { getCurrentUser, getSolutionPackages } from "@/lib/api";
 import { useApi } from "@/lib/useApi";
 import GlobalSearch from "@/components/GlobalSearch";
 import ChangePasswordGate from "@/components/ChangePasswordGate";
@@ -14,20 +14,52 @@ import ChangePasswordGate from "@/components/ChangePasswordGate";
 const { Sider, Header, Content } = Layout;
 const { Text } = Typography;
 
+const NESTED_KEY = "/solution-packages";
+
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const [collapsed, setCollapsed] = useState(false);
+  const [openKeys, setOpenKeys] = useState<string[]>([]);
   const pathname = usePathname();
   const router = useRouter();
   const { data: user, refetch } = useApi(getCurrentUser);
+  const { data: solutionPackages } = useApi(getSolutionPackages);
 
+  const allowedItems = user ? NAV_ITEMS.filter((item) => user.allowedModules.includes(item.key)) : NAV_ITEMS;
+  const isAllowed = (path: string) =>
+    allowedItems.some((item) => (item.key === "/" ? path === "/" : path.startsWith(item.key)));
+
+  useEffect(() => {
+    if (!user) return;
+    if (isAllowed(pathname)) return;
+    const landing = allowedItems[0];
+    if (landing) router.replace(landing.key);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user, pathname]);
+
+  useEffect(() => {
+    if (pathname.startsWith(NESTED_KEY)) {
+      setOpenKeys((keys) => (keys.includes(NESTED_KEY) ? keys : [...keys, NESTED_KEY]));
+    }
+  }, [pathname]);
+
+  const childKey = pathname.startsWith(`${NESTED_KEY}/`) ? pathname : null;
   const activeKey =
-    NAV_ITEMS.find((item) => item.key !== "/" && pathname.startsWith(item.key))?.key ??
+    childKey ??
+    allowedItems.find((item) => item.key !== "/" && pathname.startsWith(item.key))?.key ??
     (pathname === "/" ? "/" : "/");
 
   const handleLogout = async () => {
     await fetch("/api/auth/logout", { method: "POST" });
     router.push("/login");
   };
+
+  if (user && !isAllowed(pathname)) {
+    return allowedItems.length === 0 ? (
+      <div className="min-h-screen flex items-center justify-center">
+        <Text type="secondary">You don&apos;t have access to any pages yet. Contact an administrator.</Text>
+      </div>
+    ) : null;
+  }
 
   return (
     <Layout className="min-h-screen">
@@ -41,12 +73,26 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         <Menu
           mode="inline"
           selectedKeys={[activeKey]}
+          openKeys={openKeys}
+          onOpenChange={setOpenKeys}
           style={{ borderInlineEnd: "none" }}
-          items={NAV_ITEMS.map((item) => ({
-            key: item.key,
-            icon: <item.icon />,
-            label: <Link href={item.key}>{item.label}</Link>,
-          }))}
+          items={allowedItems.map((item) =>
+            item.key === NESTED_KEY && solutionPackages && solutionPackages.length > 0
+              ? {
+                  key: item.key,
+                  icon: <item.icon />,
+                  label: <Link href={item.key}>{item.label}</Link>,
+                  children: solutionPackages.map((p) => ({
+                    key: `${NESTED_KEY}/${p.id}`,
+                    label: <Link href={`${NESTED_KEY}/${p.id}`}>{p.name}</Link>,
+                  })),
+                }
+              : {
+                  key: item.key,
+                  icon: <item.icon />,
+                  label: <Link href={item.key}>{item.label}</Link>,
+                },
+          )}
         />
       </Sider>
       <Layout>

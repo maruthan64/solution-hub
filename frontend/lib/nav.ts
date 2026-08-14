@@ -11,12 +11,14 @@ import {
   AuditOutlined,
   SettingOutlined,
   StarOutlined,
+  RocketOutlined,
 } from "@ant-design/icons";
 
 export const NAV_ITEMS = [
   { key: "/", label: "Dashboard", icon: DashboardOutlined },
   { key: "/projects", label: "Projects", icon: ProjectOutlined },
   { key: "/capabilities", label: "Capabilities", icon: StarOutlined },
+  { key: "/solution-packages", label: "Solution Packages", icon: RocketOutlined },
   { key: "/service-catalog", label: "Service Catalog", icon: ShopOutlined },
   { key: "/chat", label: "AI Chat", icon: MessageOutlined },
   { key: "/documents", label: "Documents", icon: FileTextOutlined },

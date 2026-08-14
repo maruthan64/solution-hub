@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 from app.audit import log_action
 from app.auth import create_token, hash_password, require_user, verify_password
 from app.database import get_db
-from app.models import User
+from app.models import RolePermission, User
 from app.rate_limit import reset as reset_rate_limit
 from app.rate_limit import record_attempt, seconds_until_allowed
 from app.schemas import ChangePasswordRequest, CurrentUserOut, LoginRequest, LoginResponse
@@ -12,7 +12,8 @@ from app.schemas import ChangePasswordRequest, CurrentUserOut, LoginRequest, Log
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
 
-def to_current_user_out(user: User) -> CurrentUserOut:
+def to_current_user_out(user: User, db: Session) -> CurrentUserOut:
+    permission = db.get(RolePermission, user.role)
     return CurrentUserOut(
         id=user.id,
         name=user.name,
@@ -20,6 +21,7 @@ def to_current_user_out(user: User) -> CurrentUserOut:
         email=user.email or "",
         role=user.role,
         mustChangePassword=user.must_change_password,
+        allowedModules=permission.allowed_modules if permission else [],
     )
 
 
@@ -66,7 +68,7 @@ def me(user_id: str = Depends(require_user), db: Session = Depends(get_db)):
     user = db.get(User, user_id)
     if not user:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated")
-    return to_current_user_out(user)
+    return to_current_user_out(user, db)
 
 
 @router.post("/change-password", response_model=CurrentUserOut)
@@ -86,4 +88,4 @@ def change_password(
     log_action(db, user.name, "Changed own password", "-")
     db.commit()
     db.refresh(user)
-    return to_current_user_out(user)
+    return to_current_user_out(user, db)

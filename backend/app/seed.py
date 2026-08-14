@@ -8,6 +8,7 @@ from app.models import (
     KnowledgeDoc,
     Project,
     ServicePackage,
+    SolutionPackage,
     User,
 )
 
@@ -422,51 +423,56 @@ def seed():
                         id="basic",
                         category="tier",
                         name="Basic",
-                        tagline="Small workloads and dev/test environments. Fixed bundle, single AZ.",
-                        monthly_price="$450/mo",
+                        tagline="Lift-and-shift migration bundle for small estates - 5 VMs, single AZ, with connectivity and backup included.",
+                        monthly_price="$900/mo (estimate - confirm pricing)",
                         resources=[
-                            {"service": "Virtual Machine (t3.medium)", "quantity": 5, "purpose": "Application workloads"},
+                            {"service": "Virtual Machine (t3.large)", "quantity": 5, "purpose": "Migrated application workloads"},
                             {"service": "VPC", "quantity": 1, "purpose": "Network isolation"},
                             {"service": "Subnets (1 public + 1 private)", "quantity": 2, "purpose": "Network segmentation"},
+                            {"service": "Application Load Balancer", "quantity": 1, "purpose": "Traffic distribution across migrated VMs"},
                             {"service": "RDS (single-AZ, db.t3.medium)", "quantity": 1, "purpose": "Relational database"},
-                            {"service": "Security Group", "quantity": 1, "purpose": "Firewall rules"},
-                            {"service": "Internet Gateway", "quantity": 1, "purpose": "Inbound/outbound internet access"},
+                            {"service": "CloudWatch Monitoring", "quantity": 1, "purpose": "Infrastructure and application monitoring"},
+                            {"service": "AWS Backup", "quantity": 1, "purpose": "Automated backup and retention"},
+                            {"service": "VPN Gateway or Direct Connect (customer choice)", "quantity": 1, "purpose": "Secure connectivity back to the customer network"},
+                            {"service": "S3 or Storage Gateway (customer choice)", "quantity": 1, "purpose": "Backup and archival storage"},
                         ],
                     ),
                     ServicePackage(
                         id="intermediate",
                         category="tier",
                         name="Intermediate",
-                        tagline="Production workloads needing high availability across two AZs.",
-                        monthly_price="$1,200/mo",
+                        tagline="Lift-and-shift migration bundle for mid-size estates - 15 VMs across two AZs, with connectivity and backup included.",
+                        monthly_price="$2,200/mo (estimate - confirm pricing)",
                         resources=[
-                            {"service": "Virtual Machine (t3.large)", "quantity": 15, "purpose": "Application workloads"},
+                            {"service": "Virtual Machine (t3.large)", "quantity": 15, "purpose": "Migrated application workloads"},
                             {"service": "VPC", "quantity": 1, "purpose": "Network isolation"},
                             {"service": "Subnets (2 public + 2 private, 2 AZs)", "quantity": 4, "purpose": "Multi-AZ network segmentation"},
+                            {"service": "Application Load Balancer", "quantity": 1, "purpose": "Traffic distribution across migrated VMs"},
                             {"service": "RDS (Multi-AZ, db.r5.large)", "quantity": 1, "purpose": "Highly available relational database"},
-                            {"service": "Application Load Balancer", "quantity": 1, "purpose": "Ingress and traffic distribution"},
                             {"service": "NAT Gateway", "quantity": 2, "purpose": "Outbound internet access per AZ"},
-                            {"service": "S3 Bucket", "quantity": 1, "purpose": "Backups and static assets"},
-                            {"service": "CloudWatch Alarms", "quantity": 1, "purpose": "Monitoring and alerting"},
+                            {"service": "CloudWatch Monitoring", "quantity": 1, "purpose": "Infrastructure and application monitoring"},
+                            {"service": "AWS Backup", "quantity": 1, "purpose": "Automated backup and retention"},
+                            {"service": "VPN Gateway or Direct Connect (customer choice)", "quantity": 1, "purpose": "Secure connectivity back to the customer network"},
+                            {"service": "S3 or Storage Gateway (customer choice)", "quantity": 1, "purpose": "Backup and archival storage"},
                         ],
                     ),
                     ServicePackage(
                         id="advanced",
                         category="tier",
                         name="Advanced",
-                        tagline="Mission-critical workloads needing DR, edge security, and centralized observability.",
-                        monthly_price="$3,500/mo",
+                        tagline="Lift-and-shift migration bundle for large estates - 20 VMs across two AZs, HA database, with connectivity and backup included.",
+                        monthly_price="$2,900/mo (estimate - confirm pricing)",
                         resources=[
-                            {"service": "Virtual Machine (Auto Scaling Group, mixed types)", "quantity": 30, "purpose": "Application workloads with autoscaling"},
-                            {"service": "VPC (3 AZs)", "quantity": 1, "purpose": "Network isolation"},
-                            {"service": "Subnets (3 public + 3 private)", "quantity": 6, "purpose": "Multi-AZ network segmentation"},
-                            {"service": "RDS (Multi-AZ + 2 read replicas)", "quantity": 1, "purpose": "Highly available database with read scaling"},
-                            {"service": "Application Load Balancer", "quantity": 2, "purpose": "Ingress across tiers"},
-                            {"service": "NAT Gateway", "quantity": 3, "purpose": "Outbound internet access per AZ"},
-                            {"service": "CloudFront + WAF", "quantity": 1, "purpose": "CDN and edge security"},
-                            {"service": "Route 53 (failover routing)", "quantity": 1, "purpose": "DNS with health-check based failover"},
-                            {"service": "GuardDuty + Security Hub", "quantity": 1, "purpose": "Threat detection and compliance posture"},
-                            {"service": "Centralized Logging (CloudWatch Logs + S3 archive)", "quantity": 1, "purpose": "Audit and observability"},
+                            {"service": "Virtual Machine (t3.xlarge)", "quantity": 20, "purpose": "Migrated application workloads"},
+                            {"service": "VPC (2 AZs)", "quantity": 1, "purpose": "Network isolation"},
+                            {"service": "Subnets (2 public + 2 private, 2 AZs)", "quantity": 4, "purpose": "Multi-AZ network segmentation"},
+                            {"service": "Application Load Balancer", "quantity": 1, "purpose": "Traffic distribution across migrated VMs"},
+                            {"service": "RDS (Multi-AZ, db.r5.xlarge)", "quantity": 1, "purpose": "Highly available relational database"},
+                            {"service": "NAT Gateway", "quantity": 2, "purpose": "Outbound internet access per AZ"},
+                            {"service": "CloudWatch Monitoring", "quantity": 1, "purpose": "Infrastructure and application monitoring"},
+                            {"service": "AWS Backup", "quantity": 1, "purpose": "Automated backup and retention"},
+                            {"service": "VPN Gateway or Direct Connect (customer choice)", "quantity": 1, "purpose": "Secure connectivity back to the customer network"},
+                            {"service": "S3 or Storage Gateway (customer choice)", "quantity": 1, "purpose": "Backup and archival storage"},
                         ],
                     ),
                     ServicePackage(
@@ -618,6 +624,205 @@ def seed():
                             "Google Kubernetes Engine (GKE)",
                         ],
                         status="Active",
+                    ),
+                ]
+            )
+
+        if db.query(SolutionPackage).count() == 0:
+            db.add_all(
+                [
+                    SolutionPackage(
+                        id="sol-sap-on-aws-migration",
+                        name="SAP on AWS Migration",
+                        cloud="AWS",
+                        tagline="Move SAP ECC/S4HANA off legacy infrastructure onto AWS without a re-implementation.",
+                        outcome=(
+                            "Customers running SAP on aging on-prem hardware face a hardware refresh they don't want "
+                            "to pay for twice. This package moves the existing SAP landscape onto AWS as-is — same "
+                            "version, same customizations — then right-sizes it on SAP-certified instances, cutting "
+                            "infrastructure spend while removing the refresh cycle entirely."
+                        ),
+                        assumptions=[
+                            "Customer has an existing AWS account, or one will be provisioned as part of the landing zone.",
+                            "The current SAP version and customizations are supported on AWS-certified instance types (no SAP version upgrade in scope).",
+                            "Customer can provide a maintenance window for cutover per environment (sandbox, QA, production).",
+                            "Network connectivity (VPN or Direct Connect) to the customer's SAP GUI users is established before cutover.",
+                        ],
+                        services=[
+                            {"service": "SAP-certified EC2 instances (X2iedn / U-series)", "purpose": "SAP application and HANA database tiers"},
+                            {"service": "EBS (io2 Block Express)", "purpose": "High-IOPS storage for the HANA database"},
+                            {"service": "AWS Backint Agent", "purpose": "SAP HANA-native backup"},
+                            {"service": "AWS Launch Wizard for SAP", "purpose": "Guided, SAP-validated deployment"},
+                            {"service": "Direct Connect", "purpose": "Low-latency link back to the customer's SAP GUI users"},
+                        ],
+                        reference_architecture=(
+                            "Landing zone with a dedicated SAP account, HANA on X2iedn in a Multi-AZ pair, "
+                            "application servers behind an internal load balancer, Backint-based backup to S3, "
+                            "and Direct Connect for on-prem connectivity during and after cutover."
+                        ),
+                        pricing_note="Scoped per SAP landscape size — starting at $25,000 for the migration engagement.",
+                    ),
+                    SolutionPackage(
+                        id="sol-disaster-recovery",
+                        name="Disaster Recovery Solution",
+                        cloud="AWS",
+                        tagline="Pilot-light DR in AWS for an on-prem or single-region production estate.",
+                        outcome=(
+                            "Most customers asking for this have no DR plan at all today, or one that's never been "
+                            "tested. This package stands up a pilot-light environment in a second AWS region — "
+                            "data replicated continuously, compute scaled to zero until a failover is declared — so "
+                            "recovery is a runbook, not a scramble, and the ongoing cost stays low between drills."
+                        ),
+                        assumptions=[
+                            "Source estate is either already on AWS (single region) or reachable from AWS via VPN/Direct Connect for replication.",
+                            "Customer defines and signs off on an RPO/RTO target before the architecture is finalized.",
+                            "A DR drill (failover test) is run at least twice a year to validate the runbook — not included as one-time setup.",
+                            "Source servers meet the DRS agent's supported OS versions.",
+                        ],
+                        services=[
+                            {"service": "AWS Elastic Disaster Recovery (DRS)", "purpose": "Continuous block-level replication from the source estate"},
+                            {"service": "RDS Cross-Region Read Replica", "purpose": "Warm-standby database in the DR region"},
+                            {"service": "Route 53 (failover routing)", "purpose": "DNS cutover on failover declaration"},
+                            {"service": "S3 Cross-Region Replication", "purpose": "Object storage replicated to the DR region"},
+                            {"service": "AWS Backup", "purpose": "Point-in-time recovery independent of replication"},
+                        ],
+                        reference_architecture=(
+                            "Source estate replicated via DRS into a staging subnet in the DR region; RDS read "
+                            "replica promoted on failover; Route 53 health-check-based failover routing; runbook-"
+                            "driven failback once the primary region recovers."
+                        ),
+                        pricing_note="Starting at $12,000 setup, plus ongoing replication and standby costs.",
+                    ),
+                    SolutionPackage(
+                        id="sol-vdi-rollout",
+                        name="VDI Rollout",
+                        cloud="AWS",
+                        tagline="Cloud-hosted virtual desktops for a distributed or contractor-heavy workforce.",
+                        outcome=(
+                            "Customers with remote or contractor staff who can't be issued corporate laptops, or "
+                            "who need to keep sensitive data off local disks, end up managing this ad hoc with VPN "
+                            "plus RDP. This package replaces that with managed virtual desktops — provisioned per "
+                            "user group, patched centrally, and with no data ever landing on the endpoint."
+                        ),
+                        assumptions=[
+                            "Customer has (or will procure) an Active Directory to join WorkSpaces to — this package doesn't stand up a new identity source.",
+                            "End users have internet access sufficient to reach the WorkSpaces client or browser (no dedicated network build included).",
+                            "Application licensing for anything delivered via WAM is the customer's responsibility.",
+                            "Per-seat pricing assumes standard bundle sizing — GPU or power-user bundles are priced separately.",
+                        ],
+                        services=[
+                            {"service": "Amazon WorkSpaces", "purpose": "Managed persistent virtual desktops"},
+                            {"service": "AWS Managed Microsoft AD", "purpose": "Directory services and desktop authentication"},
+                            {"service": "FSx for Windows File Server", "purpose": "Redirected user profiles and shared drives"},
+                            {"service": "WorkSpaces Application Manager", "purpose": "Centralized application packaging and delivery"},
+                        ],
+                        reference_architecture=(
+                            "WorkSpaces provisioned per department in a dedicated VPC, joined to AWS Managed "
+                            "Microsoft AD, with FSx-backed profile redirection and app delivery through WAM — no "
+                            "local persistence, all access over the WorkSpaces client or browser."
+                        ),
+                        pricing_note="Per-seat monthly, from $35/user — no upfront project cost.",
+                    ),
+                    SolutionPackage(
+                        id="sol-migration-basic",
+                        name="Migration-Basic",
+                        cloud="AWS",
+                        tagline="Lift-and-shift migration for a small estate — 5 VMs, single AZ.",
+                        outcome=(
+                            "For customers with a small, well-understood estate who want off legacy infrastructure "
+                            "without redesigning anything. Servers move as-is onto right-sized EC2 instances, with "
+                            "the database, load balancing, and monitoring in place from day one — no re-architecture, "
+                            "no application changes."
+                        ),
+                        assumptions=[
+                            "Operating systems and applications being migrated are owned and licensed by the customer — no OS or software licensing included.",
+                            "Reaching and coordinating with individual business/application owners is the customer's responsibility.",
+                            "Source servers are compatible with AWS Application Migration Service (MGN) agent requirements.",
+                            "Total data migration volume is under 2TB — larger volumes need AWS DataSync or Snowball, priced separately.",
+                        ],
+                        services=[
+                            {"service": "Virtual Machine (t3.large) x5", "purpose": "Migrated application workloads"},
+                            {"service": "AWS Application Migration Service (MGN)", "purpose": "Lift-and-shift replication and cutover"},
+                            {"service": "VPC", "purpose": "Network isolation"},
+                            {"service": "RDS (single-AZ, db.t3.medium)", "purpose": "Relational database"},
+                            {"service": "Application Load Balancer", "purpose": "Traffic distribution across migrated VMs"},
+                            {"service": "CloudWatch Monitoring", "purpose": "Infrastructure and application monitoring"},
+                            {"service": "AWS Backup", "purpose": "Automated backup and retention"},
+                        ],
+                        reference_architecture=(
+                            "Single-AZ VPC with public and private subnets, MGN-based replication from source "
+                            "servers to EC2, single-AZ RDS database, ALB in front of the application tier."
+                        ),
+                        pricing_note="Starting at $8,000 for the migration engagement (estimate — confirm pricing).",
+                    ),
+                    SolutionPackage(
+                        id="sol-migration-intermediate",
+                        name="Migration-Intermediate",
+                        cloud="AWS",
+                        tagline="Lift-and-shift migration for a mid-size estate — 10 VMs, Multi-AZ database.",
+                        outcome=(
+                            "For customers past the point where a single-AZ, single-instance setup is acceptable, "
+                            "but not yet running at a scale that needs a CDN or edge layer. Adds Multi-AZ database "
+                            "resilience and autoscaling so the estate survives an AZ failure and absorbs normal "
+                            "traffic variation without manual intervention."
+                        ),
+                        assumptions=[
+                            "Operating systems and applications being migrated are owned and licensed by the customer — no OS or software licensing included.",
+                            "Reaching and coordinating with individual business/application owners is the customer's responsibility.",
+                            "Source servers are compatible with AWS Application Migration Service (MGN) agent requirements.",
+                            "Total data migration volume is under 5TB — larger volumes need AWS DataSync or Snowball, priced separately.",
+                        ],
+                        services=[
+                            {"service": "Virtual Machine (t3.large, Auto Scaling Group) x10", "purpose": "Migrated application workloads with autoscaling"},
+                            {"service": "AWS Application Migration Service (MGN)", "purpose": "Lift-and-shift replication and cutover"},
+                            {"service": "VPC (2 AZs)", "purpose": "Network isolation"},
+                            {"service": "Subnets (2 public + 2 private, 2 AZs)", "purpose": "Multi-AZ network segmentation"},
+                            {"service": "RDS (Multi-AZ, db.r5.large)", "purpose": "Highly available relational database"},
+                            {"service": "Application Load Balancer", "purpose": "Traffic distribution across migrated VMs"},
+                            {"service": "Auto Scaling Policy", "purpose": "Scale VM count with load"},
+                            {"service": "CloudWatch Monitoring", "purpose": "Infrastructure and application monitoring"},
+                            {"service": "AWS Backup", "purpose": "Automated backup and retention"},
+                        ],
+                        reference_architecture=(
+                            "Multi-AZ VPC across 2 AZs, MGN-based replication from source servers to an Auto "
+                            "Scaling Group, Multi-AZ RDS database, ALB distributing traffic across both AZs."
+                        ),
+                        pricing_note="Starting at $16,000 for the migration engagement (estimate — confirm pricing).",
+                    ),
+                    SolutionPackage(
+                        id="sol-migration-advanced",
+                        name="Migration-Advanced",
+                        cloud="AWS",
+                        tagline="Lift-and-shift migration for a large estate — 20 VMs, Multi-AZ, CDN, and autoscaling.",
+                        outcome=(
+                            "For customers with a large, customer-facing estate who need edge performance and "
+                            "read-scaling on top of the resilience a mid-size migration already gets. Adds a CDN "
+                            "for static/cacheable content and a read replica so the database isn't the bottleneck "
+                            "as traffic grows."
+                        ),
+                        assumptions=[
+                            "Operating systems and applications being migrated are owned and licensed by the customer — no OS or software licensing included.",
+                            "Reaching and coordinating with individual business/application owners is the customer's responsibility.",
+                            "Source servers are compatible with AWS Application Migration Service (MGN) agent requirements.",
+                            "Total data migration volume is under 10TB — larger volumes need AWS DataSync or Snowball, priced separately.",
+                        ],
+                        services=[
+                            {"service": "Virtual Machine (t3.xlarge, Auto Scaling Group) x20", "purpose": "Migrated application workloads with autoscaling"},
+                            {"service": "AWS Application Migration Service (MGN)", "purpose": "Lift-and-shift replication and cutover"},
+                            {"service": "VPC (2 AZs)", "purpose": "Network isolation"},
+                            {"service": "Subnets (2 public + 2 private, 2 AZs)", "purpose": "Multi-AZ network segmentation"},
+                            {"service": "RDS (Multi-AZ, db.r5.xlarge) + read replica", "purpose": "Highly available database with read scaling"},
+                            {"service": "Application Load Balancer", "purpose": "Traffic distribution across migrated VMs"},
+                            {"service": "CloudFront", "purpose": "CDN for static and cacheable content"},
+                            {"service": "Auto Scaling Policy", "purpose": "Scale VM count with load"},
+                            {"service": "CloudWatch Monitoring", "purpose": "Infrastructure and application monitoring"},
+                            {"service": "AWS Backup", "purpose": "Automated backup and retention"},
+                        ],
+                        reference_architecture=(
+                            "Multi-AZ VPC across 2 AZs, MGN-based replication into an Auto Scaling Group, Multi-AZ "
+                            "RDS with a read replica, ALB behind CloudFront for edge caching and CDN delivery."
+                        ),
+                        pricing_note="Starting at $28,000 for the migration engagement (estimate — confirm pricing).",
                     ),
                 ]
             )

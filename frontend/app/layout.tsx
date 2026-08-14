@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
+import "@ant-design/v5-patch-for-react-19";
 import "./globals.css";
 
 const inter = Inter({ subsets: ["latin"] });
