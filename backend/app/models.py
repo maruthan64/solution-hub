@@ -144,7 +144,7 @@ class ServicePackage(Base):
     category: Mapped[str] = mapped_column(String(16))  # "tier" | "container"
     name: Mapped[str] = mapped_column(String(120))
     tagline: Mapped[str] = mapped_column(String(300))
-    monthly_price: Mapped[str] = mapped_column(String(32))
+    monthly_price: Mapped[str] = mapped_column(String(200))
     resources: Mapped[list] = mapped_column(JSON)  # [{service, quantity, purpose}, ...]
 
 

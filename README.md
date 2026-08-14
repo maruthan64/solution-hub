@@ -195,12 +195,21 @@ CI pipeline (lint + test + build) on every push/PR to `main`.
 
 ## Local Development
 
+Local dev runs against Postgres in Docker — same database engine as production — so
+Postgres-specific bugs (column widths, type constraints) get caught locally instead of
+on EC2. `DATABASE_URL` in `backend/.env` also accepts a `sqlite:///...` URL if you'd
+rather skip Docker for a quick one-off change, but Postgres is the default.
+
 ```bash
+# Database — from the repo root, one time (or whenever it's not already running)
+docker compose up -d        # Postgres on localhost:5433 (not 5432 — see docker-compose.yml)
+
 # Backend
 cd backend
 python -m venv venv && source venv/Scripts/activate   # Windows Git Bash
 pip install -r requirements.txt
-python -m app.seed          # creates sagenerator.db and seeds demo data
+alembic upgrade head        # creates/updates every table to match the current models
+python -m app.seed          # seeds demo data (safe to re-run — only fills empty tables)
 uvicorn app.main:app --reload --port 8000
 
 # Frontend (separate terminal)
@@ -213,13 +222,16 @@ Default login: `admin` / `admin123` (set in `backend/.env` — change before any
 use; see `backend/.env.example`-style comments in `backend/.env` for the AI provider
 and Claude CLI options).
 
-**Tests** — `cd backend && pytest` (spins up its own throwaway SQLite DB, no setup
-needed) and `cd frontend && npm test` (Vitest). Both run in CI on every push/PR to
-`main` (`.github/workflows/ci.yml`), alongside `npm run lint` and `npm run build`. See
-[`docs/development/testing.md`](docs/development/testing.md) for what's covered, how the fixtures/mocking work,
-and how to add new tests.
+**Tests** — `cd backend && pytest` (spins up its own throwaway SQLite DB regardless of
+`DATABASE_URL`, no setup needed) and `cd frontend && npm test` (Vitest). Both run in CI
+on every push/PR to `main` (`.github/workflows/ci.yml`), alongside `npm run lint` and
+`npm run build`. See [`docs/development/testing.md`](docs/development/testing.md) for
+what's covered, how the fixtures/mocking work, and how to add new tests.
 
-**Before production:** rotate the admin password, switch to Postgres, and put this
-behind HTTPS (`JWT_SECRET` is already a random secret and `/api/auth/login` already
-rate-limits repeated failures — see `backend/app/rate_limit.py`). See the Status section
-above for feature gaps.
+**Adding a feature that changes the schema?** See
+[`docs/development/adding-a-feature.md`](docs/development/adding-a-feature.md) — model
+changes need an Alembic migration, generated and committed alongside the code change.
+
+**Before production:** rotate the admin password and put this behind HTTPS (`JWT_SECRET`
+is already a random secret and `/api/auth/login` already rate-limits repeated failures —
+see `backend/app/rate_limit.py`). See the Status section above for feature gaps.

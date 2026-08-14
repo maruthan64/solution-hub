@@ -7,6 +7,26 @@ through commit history.
 
 ## Unreleased
 
+## 2026-08-14 — Local development now runs on Postgres, matching EC2
+
+SQLite never enforced column length, so a value that overflowed a `VARCHAR` column
+locally would only fail once it hit production Postgres — which is exactly what
+happened testing this: `service_packages.monthly_price` was `VARCHAR(32)`, and several
+of today's own seeded pricing strings ("$2,200/mo (estimate - confirm pricing).") are
+38-40 characters. SQLite silently accepted it; Postgres correctly rejected it. Widened
+the column (migration `7c6dd0c94313`) and switched local dev to catch this class of bug
+going forward instead of finding it on deploy.
+
+- `docker-compose.yml`'s Postgres now maps to host port **5433**, not 5432 — this
+  machine already runs a native Windows PostgreSQL service on 5432, which was silently
+  swallowing connections meant for the container (wrong password error, not a timeout,
+  which made it look like a credentials problem rather than a port conflict).
+- `backend/.env`'s `DATABASE_URL` now points at the Postgres container by default.
+  SQLite still works if you set the URL back — the app doesn't care which — but Postgres
+  is the recommended default now.
+- `README.md`'s Local Development section updated to match: `docker compose up -d` +
+  `alembic upgrade head` before `python -m app.seed`.
+
 ## 2026-08-14 — Documented the feature-development process
 
 New `docs/development/adding-a-feature.md` — the actual step-by-step process for adding

@@ -7,7 +7,10 @@ services:
       POSTGRES_PASSWORD: sagen
       POSTGRES_DB: sagenerator
     ports:
-      - "5432:5432"
+      # Host port 5433, not 5432 — this machine already runs a native Windows
+      # PostgreSQL service on 5432; sharing the port silently routes new
+      # connections to the wrong server instead of failing loudly.
+      - "5433:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
 
