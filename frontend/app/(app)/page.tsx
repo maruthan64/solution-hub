@@ -10,8 +10,19 @@ import {
   ProjectOutlined,
   FileDoneOutlined,
   PlusOutlined,
+  RocketOutlined,
+  ShopOutlined,
+  StarOutlined,
 } from "@ant-design/icons";
-import { getAllQuotes, getCurrentUser, getDocuments, getProjects } from "@/lib/api";
+import {
+  getAllQuotes,
+  getCapabilities,
+  getCurrentUser,
+  getDocuments,
+  getProjects,
+  getServiceCatalog,
+  getSolutionPackages,
+} from "@/lib/api";
 import { useApi } from "@/lib/useApi";
 import { greeting } from "@/lib/greeting";
 import { ProjectStatus } from "@/lib/types";
@@ -37,10 +48,26 @@ export default function DashboardPage() {
   const { data: projects, loading: projectsLoading, refetch } = useApi(getProjects);
   const { data: documents, loading: documentsLoading } = useApi(getDocuments);
   const { data: quotes, loading: quotesLoading } = useApi(getAllQuotes);
+  const { data: capabilities, loading: capabilitiesLoading } = useApi(getCapabilities);
+  const { data: solutionPackages, loading: solutionPackagesLoading } = useApi(getSolutionPackages);
+  const { data: servicePackages, loading: servicePackagesLoading } = useApi(getServiceCatalog);
   const { data: user } = useApi(getCurrentUser);
   const [modalOpen, setModalOpen] = useState(false);
 
-  if (projectsLoading || documentsLoading || quotesLoading || !projects || !documents || !quotes) {
+  if (
+    projectsLoading ||
+    documentsLoading ||
+    quotesLoading ||
+    capabilitiesLoading ||
+    solutionPackagesLoading ||
+    servicePackagesLoading ||
+    !projects ||
+    !documents ||
+    !quotes ||
+    !capabilities ||
+    !solutionPackages ||
+    !servicePackages
+  ) {
     return (
       <div className="flex justify-center py-20">
         <Spin size="large" />
@@ -111,6 +138,39 @@ export default function DashboardPage() {
             <Text type="secondary" className="text-xs">
               this month
             </Text>
+          </Card>
+        </Col>
+      </Row>
+
+      <Row gutter={16}>
+        <Col xs={24} sm={8}>
+          <Card>
+            <Statistic title="Capabilities" value={capabilities.length} prefix={<StarOutlined />} />
+            <Link href="/capabilities">
+              <Text type="secondary" className="text-xs">
+                Capability matrix
+              </Text>
+            </Link>
+          </Card>
+        </Col>
+        <Col xs={24} sm={8}>
+          <Card>
+            <Statistic title="Solution Packages" value={solutionPackages.length} prefix={<RocketOutlined />} />
+            <Link href="/solution-packages">
+              <Text type="secondary" className="text-xs">
+                Use-case bundles
+              </Text>
+            </Link>
+          </Card>
+        </Col>
+        <Col xs={24} sm={8}>
+          <Card>
+            <Statistic title="Service Catalog" value={servicePackages.length} prefix={<ShopOutlined />} />
+            <Link href="/service-catalog">
+              <Text type="secondary" className="text-xs">
+                Pricing tiers &amp; add-ons
+              </Text>
+            </Link>
           </Card>
         </Col>
       </Row>

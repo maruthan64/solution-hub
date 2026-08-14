@@ -7,6 +7,17 @@ through commit history.
 
 ## Unreleased
 
+## 2026-08-14 — Blueprint Navy sidebar, fixed-viewport layout, more dashboard stats
+
+- Sidebar restyled to Blueprint Navy (`#0B1F3A`), matching the login screen's existing
+  color instead of introducing a new one — scoped to just the Menu component via a
+  local `ConfigProvider`, so it doesn't affect buttons or links elsewhere in the app.
+- Fixed the page scrolling as one unit (sidebar included) on any page taller than the
+  viewport. The outer layout now locks to `h-screen`; the sidebar's nav and the main
+  content area each scroll independently, so the sidebar stays put.
+- Dashboard: added a second stats row — Capabilities, Solution Packages, and Service
+  Catalog counts, each linking to its own page, alongside the existing four.
+
 ## 2026-08-14 — Replaced the EC2 instance (lost SSH key) and redeployed fresh
 
 The private key for `cloudsolutionhub-key` was gone — not recoverable, not on any
