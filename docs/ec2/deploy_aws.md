@@ -203,12 +203,52 @@ bash docs/ec2/sagen.sh stop       # stop both services
 bash docs/ec2/sagen.sh restart    # restart both (no code changes)
 bash docs/ec2/sagen.sh status     # systemctl status for both
 bash docs/ec2/sagen.sh logs       # tail both services' logs, Ctrl+C to stop
-bash docs/ec2/sagen.sh deploy     # git pull, pip install, npm build, restart, health-check
+bash docs/ec2/sagen.sh deploy     # git pull, pip install, migrate DB, npm build, restart, health-check
 ```
 
 (Invoked via `bash` rather than `./sagen.sh` so it doesn't depend on the executable bit surviving a Windows-checked-out `git clone`/`git pull`. `chmod +x docs/ec2/sagen.sh` once on the instance if you'd rather run it directly.)
 
-`deploy` is the one you'll use most — it's every step from "ship a code change" to "it's live" in one command: pull, reinstall backend deps, rebuild the frontend, restart both services, then curl both health endpoints so you know immediately if something broke. Run it from the instance itself (over SSH), not your laptop.
+`deploy` is the one you'll use most — it's every step from "ship a code change" to "it's live" in one command: pull, reinstall backend deps, apply any pending database migrations, rebuild the frontend, restart both services, then curl both health endpoints so you know immediately if something broke. Run it from the instance itself (over SSH), not your laptop.
+
+### Database migrations (Alembic)
+
+Schema changes are tracked with [Alembic](https://alembic.sqlalchemy.org/) — every time a
+SQLAlchemy model in `backend/app/models.py` changes, generate a migration locally and
+commit it alongside the code change:
+
+```bash
+cd backend && source venv/bin/activate   # or venv\Scripts\activate on Windows
+alembic revision --autogenerate -m "add X column to Y table"
+# review the generated file in alembic/versions/ before committing — autogenerate
+# is a starting point, not a guarantee, especially for renames and data migrations
+alembic upgrade head   # apply it locally
+```
+
+`sagen.sh deploy` runs `alembic upgrade head` automatically on every deploy, so once a
+migration is committed, shipping the schema change is just `git push` + `sagen.sh deploy`
+like any other code change — no manual `ALTER TABLE` over SSH.
+
+**One-time bootstrap for an instance that predates Alembic** (only needed once, the
+first time you deploy a commit that adds `backend/alembic/`): the instance's Postgres
+already has most tables from before migrations were tracked, so `alembic upgrade head`
+can't run cold — it would try to re-create tables that already exist. Do this instead,
+in order:
+
+```bash
+cd ~/sa-generator && git pull
+cd backend && source venv/bin/activate && pip install -r requirements.txt
+
+# Restart FIRST — Base.metadata.create_all() runs on app startup and creates any
+# brand-new tables the new code needs (harmless no-op for tables that already exist).
+sudo systemctl restart sagen-backend sagen-frontend
+
+# NOW the DB matches current models closely enough to stamp — this records
+# "you're already at this migration" without re-running its ALTER statements.
+alembic stamp head
+```
+
+After that one-time stamp, every future deploy just works through the normal
+`sagen.sh deploy` flow.
 
 ### 6. nginx + free TLS via Let's Encrypt
 

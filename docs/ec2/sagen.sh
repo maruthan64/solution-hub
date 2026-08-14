@@ -32,6 +32,9 @@ case "$1" in
     echo "==> Installing backend dependencies"
     cd "$APP_DIR/backend" && source venv/bin/activate && pip install -r requirements.txt
 
+    echo "==> Applying database migrations"
+    alembic upgrade head
+
     echo "==> Building frontend"
     cd "$APP_DIR/frontend" && npm install && npm run build
 
@@ -51,7 +54,7 @@ case "$1" in
     echo "  restart  - restart both services (no code changes)"
     echo "  status   - show systemd status for both"
     echo "  logs     - tail both services' logs (Ctrl+C to stop)"
-    echo "  deploy   - git pull, reinstall deps, rebuild frontend, restart, health-check"
+    echo "  deploy   - git pull, reinstall deps, apply DB migrations, rebuild frontend, restart, health-check"
     exit 1
     ;;
 esac

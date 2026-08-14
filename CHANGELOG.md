@@ -7,6 +7,37 @@ through commit history.
 
 ## Unreleased
 
+## 2026-08-14 — Database migrations via Alembic
+
+Every schema change up to now was a hand-written `ALTER TABLE` run manually over SSH —
+fragile, and easy to forget on one environment while remembering it on another (this bit
+us twice in one session: the `bedrock_api_key` widening, then the `solution_packages`
+`assumptions` column).
+
+- Added Alembic, configured to read the app's own `DATABASE_URL` (no second URL to keep
+  in sync) and to run in batch mode so SQLite (dev) and Postgres (prod) share one
+  migration file without branching logic.
+- Generated and applied a baseline migration that brings the local dev DB fully back in
+  sync with the current models.
+- `docs/ec2/sagen.sh deploy` now runs `alembic upgrade head` automatically — shipping a
+  schema change is `git push` + `sagen.sh deploy` like any other change, no manual SQL.
+- Documented the one-time bootstrap `docs/ec2/deploy_aws.md` needs for the existing EC2
+  instance, which predates Alembic.
+
+## 2026-08-14 — Role-based sidebar access control and Solution Packages
+
+- New `RolePermission` system: custom roles (e.g. a "Sales" role) get a configurable
+  subset of the sidebar, managed via Users → Manage Roles. The four built-in roles
+  (Owner/Architect/Reviewer/Viewer) keep full access automatically, and newly-shipped
+  nav modules backfill into them so an Owner doesn't have to remember to grant access.
+- New Solution Packages: named use-case bundles (outcome, assumptions, services,
+  reference architecture, pricing note) distinct from Service Catalog's generic sizing
+  tiers. Nested sidebar tree, a detail page per solution, and Word/PDF export.
+- Re-scoped Service Catalog's Basic/Intermediate/Advanced tiers around migration
+  packaging, and seeded example solution packages (SAP Migration, DR, VDI Rollout, and
+  Migration-Basic/Intermediate/Advanced sized at 5/10/20 VMs).
+- Fixed an antd v5 / React 19 compatibility warning via Ant Design's official patch.
+
 ## 2026-08-06 — Word upload now preserves headings, bold text, and tables
 
 `extract_docx_text` used to be `document.paragraphs` joined with blank lines — plain
