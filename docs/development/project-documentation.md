@@ -110,7 +110,7 @@ Four roles, enforced by real role-based access control (`app/auth.py`,
 | Word import | `mammoth` (.docx → HTML, understands real Word structure) → `markdownify` (HTML → this app's Markdown) |
 | Word/PDF export | `python-docx` and `reportlab`, converting the app's Markdown back into native Word styles / PDF paragraphs |
 | Diagrams | `embed.diagrams.net` (draw.io) iframe embed — the app stores the exact mxGraph XML draw.io produces, no format translation |
-| Infra | Single EC2 instance (`t4g.micro`, `ap-south-1`), nginx reverse proxy, systemd units, provisioned via Terraform (`docs/ec2/main.tf`) |
+| Infra | Single EC2 instance (`t4g.micro`, `ap-south-1`), nginx reverse proxy, systemd units, provisioned via Terraform (`docs/deployment/main.tf`) |
 
 ### Why AWS Bedrock over LiteLLM/boto3 (a real migration that happened)
 
@@ -134,7 +134,7 @@ Browser → Route 53 (optional) → Elastic IP → nginx (:80/:443)
 
 Rough cost: **$8–10/month** (`t4g.micro` + 20GB gp3 EBS + Route 53 zone), versus
 $70–100+/month for the standard ALB+RDS+NAT shape. This is a deliberate,
-documented tradeoff (`docs/ec2/deploy_aws.md`), not an oversight — it trades
+documented tradeoff (`docs/deployment/deploy-aws.md`), not an oversight — it trades
 away high availability, automated backups, and autoscaling for cost, which is
 the right call at this team's current scale.
 
@@ -408,7 +408,7 @@ a hypothetical one:
 6. **AI usage/cost tracking** — log every AI call (provider, latency,
    success/failure) so the (now-removed) fake dashboard numbers can eventually
    be replaced with real ones, if this is prioritized.
-7. **CI/CD to the EC2 instance** — deploys today are `bash docs/ec2/sagen.sh
+7. **CI/CD to the EC2 instance** — deploys today are `bash docs/deployment/sagen.sh
    deploy` run by hand over SSH. A GitHub Actions workflow triggered on push
    (or manual dispatch) would automate this.
 8. **RAG/semantic Knowledge Base search** — deferred by explicit choice, not

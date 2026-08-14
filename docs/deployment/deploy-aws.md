@@ -194,19 +194,19 @@ Both bind to `127.0.0.1` only — nginx is the one thing actually exposed to the
 
 ### Starting, stopping, and redeploying
 
-`docs/ec2/sagen.sh` (checked into the repo, so it comes along with `git clone`/`git pull`) wraps the systemd/rebuild commands above so you don't have to retype them by hand:
+`docs/deployment/sagen.sh` (checked into the repo, so it comes along with `git clone`/`git pull`) wraps the systemd/rebuild commands above so you don't have to retype them by hand:
 
 ```bash
 cd ~/sa-generator
-bash docs/ec2/sagen.sh start      # start both services
-bash docs/ec2/sagen.sh stop       # stop both services
-bash docs/ec2/sagen.sh restart    # restart both (no code changes)
-bash docs/ec2/sagen.sh status     # systemctl status for both
-bash docs/ec2/sagen.sh logs       # tail both services' logs, Ctrl+C to stop
-bash docs/ec2/sagen.sh deploy     # git pull, pip install, migrate DB, npm build, restart, health-check
+bash docs/deployment/sagen.sh start      # start both services
+bash docs/deployment/sagen.sh stop       # stop both services
+bash docs/deployment/sagen.sh restart    # restart both (no code changes)
+bash docs/deployment/sagen.sh status     # systemctl status for both
+bash docs/deployment/sagen.sh logs       # tail both services' logs, Ctrl+C to stop
+bash docs/deployment/sagen.sh deploy     # git pull, pip install, migrate DB, npm build, restart, health-check
 ```
 
-(Invoked via `bash` rather than `./sagen.sh` so it doesn't depend on the executable bit surviving a Windows-checked-out `git clone`/`git pull`. `chmod +x docs/ec2/sagen.sh` once on the instance if you'd rather run it directly.)
+(Invoked via `bash` rather than `./sagen.sh` so it doesn't depend on the executable bit surviving a Windows-checked-out `git clone`/`git pull`. `chmod +x docs/deployment/sagen.sh` once on the instance if you'd rather run it directly.)
 
 `deploy` is the one you'll use most — it's every step from "ship a code change" to "it's live" in one command: pull, reinstall backend deps, apply any pending database migrations, rebuild the frontend, restart both services, then curl both health endpoints so you know immediately if something broke. Run it from the instance itself (over SSH), not your laptop.
 
@@ -256,7 +256,7 @@ curl -s -o /dev/null -w "frontend: %{http_code}\n" http://127.0.0.1:3000
 ```
 
 After that one-time stamp, every future deploy just works through the normal
-`sagen.sh deploy` flow — `bash docs/ec2/sagen.sh deploy` and nothing else.
+`sagen.sh deploy` flow — `bash docs/deployment/sagen.sh deploy` and nothing else.
 
 ### 6. nginx + free TLS via Let's Encrypt
 

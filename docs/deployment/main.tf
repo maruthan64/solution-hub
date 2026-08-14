@@ -1,7 +1,7 @@
 # CloudSolution Hub on AWS — single EC2 instance in its own dedicated VPC, no
 # load balancer. TLS terminates on the instance itself via nginx + a free
 # Let's Encrypt certificate (certbot) — this is the same "minimal-cost shape"
-# docs/ec2/deploy_aws.md documents as manual copy-paste steps; this file just
+# docs/deployment/deploy-aws.md documents as manual copy-paste steps; this file just
 # automates the provisioning half of it (network, instance, DB init, nginx +
 # certbot package install). Route 53 is optional: leave domain_name /
 # route53_zone_name unset to get a plain http://<elastic-ip> instance for
@@ -232,14 +232,14 @@ resource "aws_security_group" "app" {
 # EC2 instance — installs app runtime deps (Python, Node), PostgreSQL natively
 # (no Docker, no RDS), nginx, and certbot; initializes Postgres and creates the
 # app database/user; writes the nginx reverse-proxy config from
-# docs/ec2/deploy_aws.md §6 (server_name is the real domain if one was given,
+# docs/deployment/deploy-aws.md §6 (server_name is the real domain if one was given,
 # otherwise nginx's "_" catch-all so plain-IP access still works).
 #
 # NOT automated here, on purpose: cloning the repo, building the app, the
 # systemd units for the frontend/backend, and actually running
 # `certbot --nginx -d <domain>` (needs DNS to have already propagated to the
 # Elastic IP this same apply creates — racing that from user_data would fail
-# unpredictably). Those stay the manual step-by-step in docs/ec2/deploy_aws.md.
+# unpredictably). Those stay the manual step-by-step in docs/deployment/deploy-aws.md.
 # ---------------------------------------------------------------------------
 
 resource "aws_instance" "app" {

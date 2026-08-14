@@ -7,6 +7,19 @@ through commit history.
 
 ## Unreleased
 
+## 2026-08-14 — Reorganized docs/ into deployment / development / how-to-use
+
+`docs/ec2/` mixed Terraform, the deploy script, and the deploy guide with no clear home
+for anything else, and `PROJECT_DOCUMENTATION.md` was the only architecture reference —
+no separation between "how do I ship this" and "how does this actually work."
+
+- `docs/ec2/` → `docs/deployment/` (Terraform, `sagen.sh`, `deploy-aws.md`).
+- `docs/PROJECT_DOCUMENTATION.md` → `docs/development/project-documentation.md`;
+  `docs/testing.md` → `docs/development/testing.md`.
+- New `docs/how-to-use/` — empty for now, scaffolded for an end-user guide.
+- All `.md` filenames lowercased (`deploy_aws.md` → `deploy-aws.md`, etc.) for a
+  consistent naming convention across `docs/`.
+
 ## 2026-08-14 — Database migrations via Alembic
 
 Every schema change up to now was a hand-written `ALTER TABLE` run manually over SSH —
@@ -19,10 +32,11 @@ us twice in one session: the `bedrock_api_key` widening, then the `solution_pack
   migration file without branching logic.
 - Generated and applied a baseline migration that brings the local dev DB fully back in
   sync with the current models.
-- `docs/ec2/sagen.sh deploy` now runs `alembic upgrade head` automatically — shipping a
-  schema change is `git push` + `sagen.sh deploy` like any other change, no manual SQL.
-- Documented the one-time bootstrap `docs/ec2/deploy_aws.md` needs for the existing EC2
-  instance, which predates Alembic.
+- `docs/deployment/sagen.sh deploy` now runs `alembic upgrade head` automatically —
+  shipping a schema change is `git push` + `sagen.sh deploy` like any other change, no
+  manual SQL.
+- Documented the one-time bootstrap `docs/deployment/deploy-aws.md` needs for the
+  existing EC2 instance, which predates Alembic.
 
 ## 2026-08-14 — Role-based sidebar access control and Solution Packages
 
