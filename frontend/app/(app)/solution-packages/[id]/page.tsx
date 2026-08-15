@@ -156,7 +156,7 @@ export default function SolutionPackageDetailPage({ params }: { params: Promise<
   };
 
   return (
-    <div className="flex flex-col gap-4" style={{ maxWidth: 820 }}>
+    <div className="flex flex-col gap-4 mx-auto" style={{ maxWidth: 820 }}>
       {contextHolder}
       {modalContextHolder}
       <Link href="/solution-packages" className="inline-flex items-center gap-1 text-sm text-gray-500">

@@ -186,7 +186,7 @@ export default function SettingsPage() {
         <Text type="secondary">Organization details, branding, AI provider, and export defaults.</Text>
       </div>
 
-      <div className="flex gap-6" style={{ maxWidth: 880 }}>
+      <div className="flex gap-6 mx-auto" style={{ maxWidth: 880 }}>
         <div className="w-[190px] shrink-0 flex flex-col gap-1">
           {categories.map((c) => (
             <button

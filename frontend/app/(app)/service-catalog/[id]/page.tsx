@@ -74,7 +74,7 @@ export default function ServicePackageEditPage({ params }: { params: Promise<{ i
   };
 
   return (
-    <div className="flex flex-col gap-4" style={{ maxWidth: 900 }}>
+    <div className="flex flex-col gap-4 mx-auto" style={{ maxWidth: 900 }}>
       {contextHolder}
       <Link href="/service-catalog" className="inline-flex items-center gap-1 text-sm text-gray-500">
         <ArrowLeftOutlined /> Back to Service Catalog

@@ -70,63 +70,66 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         onCollapse={setCollapsed}
         theme="dark"
         width={232}
-        className="flex flex-col"
         style={{ background: "#0B1F3A", height: "100vh" }}
       >
-        <div
-          className="h-16 flex items-center justify-center border-b shrink-0"
-          style={{ borderColor: "rgba(255,255,255,0.08)" }}
-        >
-          <span
-            className="text-xl font-semibold whitespace-nowrap overflow-hidden"
-            style={{ color: "#E7ECF5" }}
+        {/* antd wraps Sider children in its own non-flex .ant-layout-sider-children div,
+            so the flex context has to be established here, one level in, not on Sider itself. */}
+        <div className="h-full flex flex-col">
+          <div
+            className="h-16 flex items-center justify-center border-b shrink-0"
+            style={{ borderColor: "rgba(255,255,255,0.08)" }}
           >
-            {collapsed ? "📐" : "📐 CloudSolution Hub"}
-          </span>
-        </div>
-        <ConfigProvider
-          theme={{
-            components: {
-              Menu: {
-                darkItemBg: "#0B1F3A",
-                darkItemColor: "#9DAEC9",
-                darkItemSelectedBg: "#16294D",
-                darkItemSelectedColor: "#FFFFFF",
-                darkItemHoverColor: "#FFFFFF",
-                darkItemHoverBg: "#16294D",
-                darkSubMenuItemBg: "#0B1F3A",
-              },
-            },
-          }}
-        >
-          <div className="flex-1 overflow-y-auto">
-            <Menu
-              theme="dark"
-              mode="inline"
-              selectedKeys={[activeKey]}
-              openKeys={openKeys}
-              onOpenChange={setOpenKeys}
-              style={{ borderInlineEnd: "none", background: "transparent" }}
-              items={allowedItems.map((item) =>
-                item.key === NESTED_KEY && solutionPackages && solutionPackages.length > 0
-                  ? {
-                      key: item.key,
-                      icon: <item.icon />,
-                      label: <Link href={item.key}>{item.label}</Link>,
-                      children: solutionPackages.map((p) => ({
-                        key: `${NESTED_KEY}/${p.id}`,
-                        label: <Link href={`${NESTED_KEY}/${p.id}`}>{p.name}</Link>,
-                      })),
-                    }
-                  : {
-                      key: item.key,
-                      icon: <item.icon />,
-                      label: <Link href={item.key}>{item.label}</Link>,
-                    },
-              )}
-            />
+            <span
+              className="text-xl font-semibold whitespace-nowrap overflow-hidden"
+              style={{ color: "#E7ECF5" }}
+            >
+              {collapsed ? "📐" : "📐 CloudSolution Hub"}
+            </span>
           </div>
-        </ConfigProvider>
+          <ConfigProvider
+            theme={{
+              components: {
+                Menu: {
+                  darkItemBg: "#0B1F3A",
+                  darkItemColor: "#9DAEC9",
+                  darkItemSelectedBg: "#16294D",
+                  darkItemSelectedColor: "#FFFFFF",
+                  darkItemHoverColor: "#FFFFFF",
+                  darkItemHoverBg: "#16294D",
+                  darkSubMenuItemBg: "#0B1F3A",
+                },
+              },
+            }}
+          >
+            <div className="flex-1 min-h-0 overflow-y-auto pb-12">
+              <Menu
+                theme="dark"
+                mode="inline"
+                selectedKeys={[activeKey]}
+                openKeys={openKeys}
+                onOpenChange={setOpenKeys}
+                style={{ borderInlineEnd: "none", background: "transparent" }}
+                items={allowedItems.map((item) =>
+                  item.key === NESTED_KEY && solutionPackages && solutionPackages.length > 0
+                    ? {
+                        key: item.key,
+                        icon: <item.icon />,
+                        label: <Link href={item.key}>{item.label}</Link>,
+                        children: solutionPackages.map((p) => ({
+                          key: `${NESTED_KEY}/${p.id}`,
+                          label: <Link href={`${NESTED_KEY}/${p.id}`}>{p.name}</Link>,
+                        })),
+                      }
+                    : {
+                        key: item.key,
+                        icon: <item.icon />,
+                        label: <Link href={item.key}>{item.label}</Link>,
+                      },
+                )}
+              />
+            </div>
+          </ConfigProvider>
+        </div>
       </Sider>
       <Layout className="h-screen">
         <Header className="!bg-white !px-6 flex items-center justify-between border-b border-gray-200 shrink-0">

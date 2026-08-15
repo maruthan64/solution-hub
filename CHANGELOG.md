@@ -7,6 +7,37 @@ through commit history.
 
 ## Unreleased
 
+## 2026-08-14 — Imported the AWS delivery capability catalog (90 capabilities)
+
+The full AWS practice capability matrix existed only as a standalone HTML document
+(`aws-capabilities-master.html`) that was never wired into the app — the Capabilities
+page only had 4 unrelated seeded entries. Added an Alembic data migration that imports
+all 90 capabilities from that document (Infrastructure, Networking & Security, Database,
+Migration, Applications, Operations), each with its real description and key AWS
+services. The source HTML file has been removed now that its content lives in the app;
+Capabilities now shows 94 total. Migration is idempotent (skips ids that already exist)
+and its downgrade removes exactly the ids it added.
+
+## 2026-08-14 — Sidebar navigation could silently overflow off-screen
+
+Root-caused the earlier "Settings not visible on some screens" report: antd's `Sider`
+wraps whatever you pass it in its own internal `.ant-layout-sider-children` div, which
+is not a flex container — so the `flex flex-col` classes on `Sider` itself never reached
+the logo/menu elements as real flex items. The menu list just grew to its natural
+height with no scroll boundary, so on shorter viewports the last nav items (including
+Settings) ran under Ant Design's fixed collapse-trigger bar with no way to reach them.
+Fixed by establishing the flex context one level in, inside Sider's own children, so the
+menu area is properly bounded and scrolls internally on any screen size.
+
+## 2026-08-14 — Fixed content blocks now center instead of hugging the left edge
+
+Settings, Solution Package detail, and Service Catalog detail pages cap their content
+at a fixed max-width but were never centered — on a wide/external monitor that left a
+large empty strip on the right, while on a laptop screen the same page looked fine
+since the cap roughly matched the viewport width. Added `mx-auto` to all three so the
+layout is consistent across screen sizes (matches the pattern the AI Chat page already
+used).
+
 ## 2026-08-14 — Edit permissions locked down; Solution Packages gets a real view/edit split
 
 Service Catalog and Solution Packages' detail/edit pages had no role check at all — any
