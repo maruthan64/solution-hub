@@ -26,6 +26,7 @@ import {
   MinusCircleOutlined,
   PlusOutlined,
   ProjectOutlined,
+  SearchOutlined,
   TrophyOutlined,
 } from "@ant-design/icons";
 import {
@@ -72,9 +73,21 @@ export default function CapabilitiesPage() {
   const [form] = Form.useForm<FormValues>();
   const [saving, setSaving] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [search, setSearch] = useState("");
   const [messageApi, contextHolder] = message.useMessage();
 
   const canEdit = currentUser?.role === "Owner" || currentUser?.role === "Architect";
+
+  const q = search.trim().toLowerCase();
+  const filteredCapabilities = (capabilities ?? []).filter((c) => {
+    if (!q) return true;
+    return (
+      c.name.toLowerCase().includes(q) ||
+      c.description.toLowerCase().includes(q) ||
+      c.cloud.toLowerCase().includes(q) ||
+      c.keyServices.some((s) => s.toLowerCase().includes(q))
+    );
+  });
 
   const openCreate = () => {
     form.setFieldsValue({
@@ -180,6 +193,17 @@ export default function CapabilitiesPage() {
         <ExportOutlined /> Export to share the full capability matrix with marketing or sales.
       </Text>
 
+      {!loading && capabilities && capabilities.length > 0 && (
+        <Input
+          prefix={<SearchOutlined className="text-gray-400" />}
+          placeholder="Search capabilities by name, description, or service..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          allowClear
+          style={{ maxWidth: 360 }}
+        />
+      )}
+
       {loading || !capabilities ? (
         <div className="flex justify-center py-20">
           <Spin size="large" />
@@ -188,9 +212,13 @@ export default function CapabilitiesPage() {
         <Card>
           <Text type="secondary">No capabilities yet. Add your first one.</Text>
         </Card>
+      ) : filteredCapabilities.length === 0 ? (
+        <Card>
+          <Text type="secondary">No capabilities match &quot;{search}&quot;.</Text>
+        </Card>
       ) : (
         <div className="grid gap-4" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))" }}>
-          {capabilities.map((c) => (
+          {filteredCapabilities.map((c) => (
             <Card
               key={c.id}
               actions={

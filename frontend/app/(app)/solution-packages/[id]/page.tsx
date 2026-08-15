@@ -83,6 +83,11 @@ export default function SolutionPackageDetailPage({ params }: { params: Promise<
     );
   }
 
+  // `editMode` can also be set via the ?edit=1 URL param, which is not itself
+  // permission-checked — this is the actual gate that keeps a non-editor from
+  // reaching the edit form (and its working Save/Delete buttons) that way.
+  const showEditMode = editMode && canEdit;
+
   const updateService = (index: number, patch: Partial<SolutionPackageService>) => {
     setServices((rows) => rows.map((r, i) => (i === index ? { ...r, ...patch } : r)));
   };
@@ -176,7 +181,7 @@ export default function SolutionPackageDetailPage({ params }: { params: Promise<
           </Title>
         </div>
         <div className="flex gap-2">
-          {editMode ? (
+          {showEditMode ? (
             <>
               <Button icon={<EyeOutlined />} onClick={() => setPreviewOpen(true)}>
                 Preview
@@ -207,7 +212,7 @@ export default function SolutionPackageDetailPage({ params }: { params: Promise<
         </div>
       </div>
 
-      {!editMode ? (
+      {!showEditMode ? (
         <ReadOnlyView pkg={pkg} />
       ) : (
         <>

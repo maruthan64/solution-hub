@@ -360,7 +360,7 @@ export const removeServer = (name: string) =>
   apiFetch<{ ok: boolean }>(`/api/mcp/servers/${encodeURIComponent(name)}`, { method: "DELETE" });
 
 export interface SearchResult {
-  type: "project" | "document" | "template" | "knowledge";
+  type: "project" | "document" | "template" | "knowledge" | "capability" | "service_package" | "solution_package";
   id: string;
   title: string;
   subtitle: string;

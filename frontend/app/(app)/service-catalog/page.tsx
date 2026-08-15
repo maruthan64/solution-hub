@@ -29,6 +29,7 @@ import {
   FileTextOutlined,
   FileWordOutlined,
   PlusOutlined,
+  SearchOutlined,
   ShoppingCartOutlined,
   StarFilled,
 } from "@ant-design/icons";
@@ -303,6 +304,7 @@ export default function ServiceCatalogPage() {
   const [savingCostEstimate, setSavingCostEstimate] = useState(false);
   const [projectId, setProjectId] = useState<string | null>(null);
   const [projectName, setProjectName] = useState<string | null>(null);
+  const [search, setSearch] = useState("");
   const [messageApi, contextHolder] = message.useMessage();
 
   useEffect(() => {
@@ -323,9 +325,18 @@ export default function ServiceCatalogPage() {
     );
   }
 
-  const tiers = packages.filter((p) => p.category === "tier");
-  const containers = packages.filter((p) => p.category === "container");
-  const addons = packages.filter((p) => p.category === "addon");
+  const q = search.trim().toLowerCase();
+  const searchedPackages = packages.filter((p) => {
+    if (!q) return true;
+    return (
+      p.name.toLowerCase().includes(q) ||
+      p.tagline.toLowerCase().includes(q) ||
+      p.resources.some((r) => r.service.toLowerCase().includes(q))
+    );
+  });
+  const tiers = searchedPackages.filter((p) => p.category === "tier");
+  const containers = searchedPackages.filter((p) => p.category === "container");
+  const addons = searchedPackages.filter((p) => p.category === "addon");
   const cartPackages = cart.map((id) => packages.find((p) => p.id === id)).filter((p): p is ServicePackage => !!p);
   const comparePackages = compareIds
     .map((id) => packages.find((p) => p.id === id))
@@ -430,36 +441,63 @@ export default function ServiceCatalogPage() {
         />
       )}
 
-      <Alert
-        type="info"
-        showIcon
-        message="Not sure what to pick?"
-        description={
-          <ul className="text-sm mt-1 pl-4" style={{ listStyle: "disc", lineHeight: 1.9 }}>
-            <li>Small workload, just getting started → <b>Basic</b></li>
-            <li>Need high availability across AZs → <b>Intermediate</b> (most customers)</li>
-            <li>Mission-critical, need DR &amp; compliance → <b>Advanced</b></li>
-            <li>Running Kubernetes or containers → add <b>EKS</b> or <b>ECS</b></li>
-            <li>Need a dedicated database, backups, or a security add-on → see <b>Additional Add-Ons</b></li>
-          </ul>
-        }
+      <Input
+        prefix={<SearchOutlined className="text-gray-400" />}
+        placeholder="Search packages by name, tagline, or resource..."
+        value={search}
+        onChange={(e) => setSearch(e.target.value)}
+        allowClear
+        style={{ maxWidth: 360 }}
       />
 
-      {renderRow(tiers)}
+      {!q && (
+        <Alert
+          type="info"
+          showIcon
+          message="Not sure what to pick?"
+          description={
+            <ul className="text-sm mt-1 pl-4" style={{ listStyle: "disc", lineHeight: 1.9 }}>
+              <li>Small workload, just getting started → <b>Basic</b></li>
+              <li>Need high availability across AZs → <b>Intermediate</b> (most customers)</li>
+              <li>Mission-critical, need DR &amp; compliance → <b>Advanced</b></li>
+              <li>Running Kubernetes or containers → add <b>EKS</b> or <b>ECS</b></li>
+              <li>Need a dedicated database, backups, or a security add-on → see <b>Additional Add-Ons</b></li>
+            </ul>
+          }
+        />
+      )}
 
-      <Divider orientation="left" orientationMargin={0}>
-        <Text type="secondary" className="text-sm font-normal">
-          Container Services (add-on)
-        </Text>
-      </Divider>
-      {renderRow(containers)}
+      {q && searchedPackages.length === 0 ? (
+        <Card>
+          <Text type="secondary">No packages match &quot;{search}&quot;.</Text>
+        </Card>
+      ) : (
+        <>
+          {tiers.length > 0 && renderRow(tiers)}
 
-      <Divider orientation="left" orientationMargin={0}>
-        <Text type="secondary" className="text-sm font-normal">
-          Additional Add-Ons
-        </Text>
-      </Divider>
-      {renderRow(addons)}
+          {containers.length > 0 && (
+            <>
+              <Divider orientation="left" orientationMargin={0}>
+                <Text type="secondary" className="text-sm font-normal">
+                  Container Services (add-on)
+                </Text>
+              </Divider>
+              {renderRow(containers)}
+            </>
+          )}
+
+          {addons.length > 0 && (
+            <>
+              <Divider orientation="left" orientationMargin={0}>
+                <Text type="secondary" className="text-sm font-normal">
+                  Additional Add-Ons
+                </Text>
+              </Divider>
+              {renderRow(addons)}
+            </>
+          )}
+        </>
+      )}
 
       {compareIds.length >= 2 && (
         <div className="fixed top-20 right-8" style={{ zIndex: 20 }}>

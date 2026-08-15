@@ -150,6 +150,24 @@ way: this is a manual step you have to actually set up — it does not happen by
 
 For the frontend, set `BACKEND_URL=http://127.0.0.1:8000` (same instance).
 
+**Source of truth: AWS SSM Parameter Store, not a hand-edited file.** `backend/.env` is
+generated, not maintained — the real values live in SSM Parameter Store under
+`/sa-generator/prod/<VARIABLE_NAME>` as `SecureString` (encrypted with the account's
+managed SSM key). `main.tf` attaches an IAM instance profile to the EC2 instance scoped
+to read-only access on exactly that path (`ssm:GetParameter`/`GetParametersByPath` +
+`kms:Decrypt` gated to calls via SSM) — no long-lived AWS credentials sit on the
+instance. `sagen.sh deploy` regenerates `backend/.env` from SSM on every deploy before
+restarting services; run `sagen.sh fetch-secrets` on its own (then `sagen.sh restart`)
+to pick up a rotated value without a full deploy.
+
+To add or rotate a value, write it to SSM directly — never edit `backend/.env` on the
+instance by hand, the next deploy will overwrite it:
+
+```bash
+aws ssm put-parameter --name /sa-generator/prod/JWT_SECRET \
+  --value "the-new-value" --type SecureString --overwrite --region ap-south-1
+```
+
 ### 5. Run both processes under systemd
 
 ```ini
@@ -198,17 +216,18 @@ Both bind to `127.0.0.1` only — nginx is the one thing actually exposed to the
 
 ```bash
 cd ~/sa-generator
-bash docs/deployment/sagen.sh start      # start both services
-bash docs/deployment/sagen.sh stop       # stop both services
-bash docs/deployment/sagen.sh restart    # restart both (no code changes)
-bash docs/deployment/sagen.sh status     # systemctl status for both
-bash docs/deployment/sagen.sh logs       # tail both services' logs, Ctrl+C to stop
-bash docs/deployment/sagen.sh deploy     # git pull, pip install, migrate DB, npm build, restart, health-check
+bash docs/deployment/sagen.sh start          # start both services
+bash docs/deployment/sagen.sh stop           # stop both services
+bash docs/deployment/sagen.sh restart        # restart both (no code changes)
+bash docs/deployment/sagen.sh status         # systemctl status for both
+bash docs/deployment/sagen.sh logs           # tail both services' logs, Ctrl+C to stop
+bash docs/deployment/sagen.sh deploy         # git pull, refresh secrets, pip install, migrate DB, npm build, restart, health-check
+bash docs/deployment/sagen.sh fetch-secrets  # regenerate backend/.env from SSM only, then run `restart` yourself
 ```
 
 (Invoked via `bash` rather than `./sagen.sh` so it doesn't depend on the executable bit surviving a Windows-checked-out `git clone`/`git pull`. `chmod +x docs/deployment/sagen.sh` once on the instance if you'd rather run it directly.)
 
-`deploy` is the one you'll use most — it's every step from "ship a code change" to "it's live" in one command: pull, reinstall backend deps, apply any pending database migrations, rebuild the frontend, restart both services, then curl both health endpoints so you know immediately if something broke. Run it from the instance itself (over SSH), not your laptop.
+`deploy` is the one you'll use most — it's every step from "ship a code change" to "it's live" in one command: pull, refresh `backend/.env` from SSM Parameter Store, reinstall backend deps, apply any pending database migrations, rebuild the frontend, restart both services, then curl both health endpoints so you know immediately if something broke. Run it from the instance itself (over SSH), not your laptop.
 
 ### Database migrations (Alembic)
 

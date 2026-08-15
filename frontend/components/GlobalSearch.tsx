@@ -7,7 +7,10 @@ import {
   BookOutlined,
   FileTextOutlined,
   ProjectOutlined,
+  RocketOutlined,
   SearchOutlined,
+  ShopOutlined,
+  StarOutlined,
   FileDoneOutlined,
 } from "@ant-design/icons";
 import { search, SearchResult } from "@/lib/api";
@@ -17,6 +20,9 @@ const TYPE_META: Record<SearchResult["type"], { label: string; icon: React.React
   document: { label: "Documents", icon: <FileTextOutlined /> },
   template: { label: "Templates", icon: <FileDoneOutlined /> },
   knowledge: { label: "Knowledge Base", icon: <BookOutlined /> },
+  capability: { label: "Capabilities", icon: <StarOutlined /> },
+  service_package: { label: "Service Catalog", icon: <ShopOutlined /> },
+  solution_package: { label: "Solution Packages", icon: <RocketOutlined /> },
 };
 
 export default function GlobalSearch() {
@@ -66,7 +72,7 @@ export default function GlobalSearch() {
     <div ref={containerRef} className="relative" style={{ width: 320 }}>
       <Input
         prefix={<SearchOutlined className="text-gray-400" />}
-        placeholder="Search projects, documents, templates..."
+        placeholder="Search projects, capabilities, packages..."
         value={query}
         onChange={(e) => setQuery(e.target.value)}
         onFocus={() => setOpen(true)}

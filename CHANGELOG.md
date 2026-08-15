@@ -7,6 +7,53 @@ through commit history.
 
 ## Unreleased
 
+## 2026-08-14 — Production secrets moved from a hand-copied .env to AWS SSM Parameter Store
+
+`backend/.env` on the EC2 instance was the actual source of truth for `DATABASE_URL`,
+`JWT_SECRET`, and admin credentials — a plaintext file someone had to SCP or hand-type,
+with no rotation, no audit trail, and no recovery if it was lost (as happened earlier
+when the original instance's SSH key was lost). Moved the real values into AWS SSM
+Parameter Store as `SecureString` under `/sa-generator/prod/*`, and gave the EC2
+instance an IAM role (`main.tf`) scoped to read-only access on exactly that path — no
+long-lived AWS credentials live on the box. `backend/.env` is now a generated artifact:
+`sagen.sh deploy` regenerates it from SSM before every restart, and a new
+`sagen.sh fetch-secrets` command does the same on its own for rotating a single value
+without a full deploy. To change a secret going forward, write it to SSM directly
+(`aws ssm put-parameter ... --overwrite`) — editing `.env` on the instance by hand no
+longer sticks past the next deploy.
+
+## 2026-08-14 — Global search now covers Capabilities, Service Catalog, and Solution Packages
+
+The header search bar (top of every page) only ever searched Projects, Documents,
+Templates, and Knowledge Base. Extended `/api/search` and the frontend `GlobalSearch`
+component to also match Capabilities (by name/description), Service Catalog packages
+(by name/tagline), and Solution Packages (by name/tagline) — on top of the per-page
+search boxes added below, so these are now reachable both from their own list page and
+from anywhere in the app.
+
+## 2026-08-14 — Frontend test coverage for permission gating, view/edit splits, and search
+
+The frontend had exactly one test file (`lib/api.ts`'s fetch wrapper) — none of the
+actual UI logic had any automated coverage. Added React Testing Library + jsdom to the
+Vitest setup and wrote component tests for Capabilities, Service Catalog, and Solution
+Packages: role-based edit-action visibility, and the new search filters. Writing the
+Solution Package detail page's test surfaced a real gap it was meant to catch: `editMode`
+could be forced on via the `?edit=1` URL query param regardless of role, so a Viewer or
+Sales user navigating there directly landed on a fully interactive edit form (working
+Save/Delete buttons included, even though the backend correctly rejects the actual
+writes). Fixed by gating the rendered edit form on `editMode && canEdit`, not `editMode`
+alone.
+
+## 2026-08-14 — Local search on Capabilities, Service Catalog, and Solution Packages
+
+None of these three list pages had any way to search or filter, and the global header
+search doesn't cover them either (it's scoped to Projects, Documents, Templates, and
+Knowledge Base) — a real gap now that Capabilities holds 94 entries after the AWS
+catalog import. Added a search box to each page that filters its own list client-side
+as you type: Capabilities matches name/description/cloud/key services, Service Catalog
+matches name/tagline/resources (and hides empty category sections while filtered),
+Solution Packages matches name/tagline/outcome/services.
+
 ## 2026-08-14 — Imported the AWS delivery capability catalog (90 capabilities)
 
 The full AWS practice capability matrix existed only as a standalone HTML document

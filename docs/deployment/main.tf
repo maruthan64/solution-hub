@@ -229,6 +229,73 @@ resource "aws_security_group" "app" {
 }
 
 # ---------------------------------------------------------------------------
+# IAM — lets the instance read its own app secrets (DB URL, JWT secret, etc.)
+# from SSM Parameter Store at deploy time instead of those living only in a
+# hand-copied backend/.env file. Scoped to this app's own parameter path and
+# read-only (ssm:PutParameter is deliberately not granted here — the one-time
+# migration of existing secrets into SSM is done interactively with a
+# temporarily broader policy, then narrowed back to this).
+# ---------------------------------------------------------------------------
+
+resource "aws_iam_role" "app" {
+  name = "${var.project_name}-instance-role"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect    = "Allow"
+      Principal = { Service = "ec2.amazonaws.com" }
+      Action    = "sts:AssumeRole"
+    }]
+  })
+
+  tags = {
+    Name = "${var.project_name}-instance-role"
+  }
+}
+
+resource "aws_iam_role_policy" "app_ssm_read" {
+  name = "${var.project_name}-ssm-read"
+  role = aws_iam_role.app.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        # ssm:GetParametersByPath authorizes against the queried path itself,
+        # not a child under it — needs both the bare path (for that call) and
+        # the wildcard (for individual ssm:GetParameter calls on each key).
+        Effect = "Allow"
+        Action = ["ssm:GetParameter", "ssm:GetParametersByPath"]
+        Resource = [
+          "arn:aws:ssm:${var.aws_region}:*:parameter/${var.project_name}/prod",
+          "arn:aws:ssm:${var.aws_region}:*:parameter/${var.project_name}/prod/*"
+        ]
+      },
+      {
+        # SecureString parameters are encrypted with the account's default
+        # AWS-managed SSM key (alias/aws/ssm). IAM resource-matching on KMS
+        # alias ARNs is unreliable, so this scopes kms:Decrypt the way AWS's
+        # own SSM docs recommend instead: any key, but only when the call
+        # actually originates from SSM decrypting a parameter on this role's
+        # behalf — the tight scoping is the ssm:GetParameter* path above.
+        Effect   = "Allow"
+        Action   = ["kms:Decrypt"]
+        Resource = "*"
+        Condition = {
+          StringEquals = { "kms:ViaService" = "ssm.${var.aws_region}.amazonaws.com" }
+        }
+      }
+    ]
+  })
+}
+
+resource "aws_iam_instance_profile" "app" {
+  name = "${var.project_name}-instance-profile"
+  role = aws_iam_role.app.name
+}
+
+# ---------------------------------------------------------------------------
 # EC2 instance — installs app runtime deps (Python, Node), PostgreSQL natively
 # (no Docker, no RDS), nginx, and certbot; initializes Postgres and creates the
 # app database/user; writes the nginx reverse-proxy config from
@@ -248,6 +315,7 @@ resource "aws_instance" "app" {
   key_name               = var.key_name
   subnet_id              = aws_subnet.public.id
   vpc_security_group_ids = [aws_security_group.app.id]
+  iam_instance_profile   = aws_iam_instance_profile.app.name
 
   root_block_device {
     volume_type = "gp3"

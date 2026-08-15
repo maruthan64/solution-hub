@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { Button, Card, Divider, Form, Input, Modal, Select, Space, Spin, Tag, Typography, message } from "antd";
-import { EditOutlined, MinusCircleOutlined, PlusOutlined, RocketOutlined } from "@ant-design/icons";
+import { EditOutlined, MinusCircleOutlined, PlusOutlined, RocketOutlined, SearchOutlined } from "@ant-design/icons";
 import { createSolutionPackage, getCurrentUser, getSolutionPackages } from "@/lib/api";
 import { useApi } from "@/lib/useApi";
 import { CloudProviderIcon } from "@/components/icons/CloudIcons";
@@ -30,9 +30,21 @@ export default function SolutionPackagesPage() {
   const [createOpen, setCreateOpen] = useState(false);
   const [form] = Form.useForm<FormValues>();
   const [saving, setSaving] = useState(false);
+  const [search, setSearch] = useState("");
   const [messageApi, contextHolder] = message.useMessage();
 
   const canEdit = currentUser?.role === "Owner" || currentUser?.role === "Architect";
+
+  const q = search.trim().toLowerCase();
+  const filteredPackages = (packages ?? []).filter((p) => {
+    if (!q) return true;
+    return (
+      p.name.toLowerCase().includes(q) ||
+      p.tagline.toLowerCase().includes(q) ||
+      p.outcome.toLowerCase().includes(q) ||
+      p.services.some((s) => s.service.toLowerCase().includes(q))
+    );
+  });
 
   const openCreate = () => {
     form.setFieldsValue({
@@ -91,6 +103,17 @@ export default function SolutionPackagesPage() {
         )}
       </div>
 
+      {!loading && packages && packages.length > 0 && (
+        <Input
+          prefix={<SearchOutlined className="text-gray-400" />}
+          placeholder="Search solution packages by name, outcome, or service..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          allowClear
+          style={{ maxWidth: 360 }}
+        />
+      )}
+
       {loading || !packages ? (
         <div className="flex justify-center py-20">
           <Spin size="large" />
@@ -99,9 +122,13 @@ export default function SolutionPackagesPage() {
         <Card>
           <Text type="secondary">No solution packages yet. Add your first one.</Text>
         </Card>
+      ) : filteredPackages.length === 0 ? (
+        <Card>
+          <Text type="secondary">No solution packages match &quot;{search}&quot;.</Text>
+        </Card>
       ) : (
         <div className="grid gap-4" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(360px, 1fr))" }}>
-          {packages.map((p) => (
+          {filteredPackages.map((p) => (
             <Card
               key={p.id}
               hoverable

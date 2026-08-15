@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 
 from app.auth import require_user
 from app.database import get_db
-from app.models import DocTemplate, GeneratedDocument, KnowledgeDoc, Project
+from app.models import Capability, DocTemplate, GeneratedDocument, KnowledgeDoc, Project, ServicePackage, SolutionPackage
 from app.schemas import SearchResult
 
 router = APIRouter(prefix="/api/search", tags=["search"])
@@ -48,6 +48,41 @@ def search(q: str = Query(default=""), db: Session = Depends(get_db), _user: str
     results += [
         SearchResult(type="knowledge", id=k.id, title=k.name, subtitle=k.category, url="/knowledge-base")
         for k in knowledge
+    ]
+
+    capabilities = (
+        db.query(Capability)
+        .filter((Capability.name.ilike(pattern)) | (Capability.description.ilike(pattern)))
+        .limit(RESULTS_PER_CATEGORY)
+        .all()
+    )
+    results += [
+        SearchResult(type="capability", id=c.id, title=c.name, subtitle=c.cloud, url="/capabilities")
+        for c in capabilities
+    ]
+
+    service_packages = (
+        db.query(ServicePackage)
+        .filter((ServicePackage.name.ilike(pattern)) | (ServicePackage.tagline.ilike(pattern)))
+        .limit(RESULTS_PER_CATEGORY)
+        .all()
+    )
+    results += [
+        SearchResult(type="service_package", id=s.id, title=s.name, subtitle=s.tagline, url="/service-catalog")
+        for s in service_packages
+    ]
+
+    solution_packages = (
+        db.query(SolutionPackage)
+        .filter((SolutionPackage.name.ilike(pattern)) | (SolutionPackage.tagline.ilike(pattern)))
+        .limit(RESULTS_PER_CATEGORY)
+        .all()
+    )
+    results += [
+        SearchResult(
+            type="solution_package", id=sp.id, title=sp.name, subtitle=sp.tagline, url=f"/solution-packages/{sp.id}"
+        )
+        for sp in solution_packages
     ]
 
     return results
